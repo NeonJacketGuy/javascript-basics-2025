@@ -14,7 +14,7 @@ const pickWeapon = function (weapon) {
     
 
 };
-
+// math.random gives us a random number.
 
 const selectComputerWeapon = function () {
     const rand = Math.floor(Math.random() * 4);
