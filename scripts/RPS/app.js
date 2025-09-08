@@ -12,7 +12,7 @@ const pickWeapon = function (weapon) {
     RAGE = RAGE+1 
     console.log("Player picked", weapon, RAGE);
     
-
+    let computerWeapon = selectComputerWeapon();
 };
 // math.random gives us a random number.
 
@@ -22,11 +22,10 @@ const selectComputerWeapon = function () {
     if (rand == 0) {
         return ROCK;
     }
+    
     if (rand == 1) {
         return PAPER;
     }
-    if (rand == 2) {
-        return SCISSORS;
-    }
     
-};
+     return SCISSORS;
+    };
