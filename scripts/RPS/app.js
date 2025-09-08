@@ -11,10 +11,7 @@ let aftermathElement = document.getElementById("aftermath");
 const pickWeapon = function (weapon) {
     RAGE = RAGE+1 
     console.log("Player picked", weapon, RAGE);
-    if (RAGE ===10 ){
-       const rageBtnEl = document.getElementById("rageBtn")?.style.display= "block";
-    console.log(rageBtnEl)
-    }
+    
 
 };
 
