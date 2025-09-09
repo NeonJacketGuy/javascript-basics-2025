@@ -3,29 +3,62 @@
 const ROCK = "rock";
 const PAPER = "paper";
 const SCISSORS = "scissors";
-var RAGE =0;
-
 
 let aftermathElement = document.getElementById("aftermath");
 
 const pickWeapon = function (weapon) {
-    RAGE = RAGE+1 
-    console.log("Player picked", weapon, RAGE);
-    
-    let computerWeapon = selectComputerWeapon();
+	console.log("Player picked", weapon);
+
+
+	let computerWeapon = selectComputerWeapon();
+	console.log("Computer picked", computerWeapon);
+
 };
-// math.random gives us a random number.
 
 const selectComputerWeapon = function () {
-    const rand = Math.floor(Math.random() * 4);
+	
+	const rand = Math.floor(Math.random() * 3);
 
-    if (rand == 0) {
-        return ROCK;
-    }
-    
-    if (rand == 1) {
-        return PAPER;
-    }
-    
-     return SCISSORS;
+	if (rand == 0) {
+		return ROCK;
+	}
+
+	if (rand == 1) {
+		return PAPER;
+	}
+
+	if (rand == 2) {
+		return SCISSORS;
+	}
+
+	
+};
+
+function decideResults(playerWeapon, computerWeapon) {
+    let results = {
+        isTie: false,
+        playerWon: false,
+        description: "",
+
     };
+
+    if (playerWeapon == computerWeapon) {
+        results.isTie = true;
+        results.description = "It's a tie! Battle Again!";
+        return results;
+    }
+
+    if (playerWeapon == ROCK && computerWeapon == SCISSORS) {
+        results.playerWon = true;
+        results.description = "Rock crushes sissors";
+        return results;
+    }
+
+
+    if (playerWeapon == SCISSORS && computerWeapon == PAPER) {
+        results.playerWon = true;
+        results.description = "Scissors Cuts Paper";
+        return results;
+    }
+
+}
