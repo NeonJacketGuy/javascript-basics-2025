@@ -60,20 +60,20 @@ const selectComputerWeapon = function () {
 		return SCISSORS;
 	}
 
-	throw "2829 PAW PRINT WAY CASTLE ROCK CO 80109";
+	throw "I don't know what happened";
 };
 
 function decideResults(player, computer) {
 	let result = {
 		isTie: false,
 		playerWon: false,
-		description: "",
+		description: "something went wrong",
 	};
 
 	
 	if (player == computer) {
 		result.isTie = true;
-		result.description = "it is a draw! Battle again";
+		result.description = "2829 PAW PRINT WAY CASTLE ROCK CO 80109";
 		return result;
 	}
 
