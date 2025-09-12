@@ -4,31 +4,48 @@ const ROCK = "rock";
 const PAPER = "paper";
 const SCISSORS = "scissors";
 
+let tieCount = 0;
+let winCount = 0;
+let lossCount = 0;
+
 /** @type { HTMLElement } */
-//@ts-ignore checking for null below : )
+//@ts-ignore checking for null below
 let aftermathElement = document.getElementById("aftermath");
 if (aftermathElement == null) {
-	throw "aftermath is not defined! Go look at your HTML because you made an mistake because you suck!!!";
+	throw "Aftermath is not deffined! Go check it because you suck!!!";
 }
+
 const pickWeapon = function (weapon) {
-	let aftermathText = `Player pciked ${weapon}. `;
+	let aftermathText = `Player picked ${weapon}. `;
 	console.log("Player picked", weapon);
 
-	
 	let computerWeapon = selectComputerWeapon();
 	console.log("Computer picked", computerWeapon);
 	aftermathText = aftermathText + `Computer picked ${computerWeapon}. `;
 
+
 	let results = decideResults(weapon, computerWeapon);
 	console.log("Battle results", results);
 
-	if(results?.isTie) {
-
+	let winner = "";
+	if (results.isTie) {
+		tieCount = tieCount + 1;
+		winner = results.description;
+	} else if (results.playerWon) {
+		winCount += 1;
+		winner = "You emerge vicorius!";
+	} else {
+		lossCount++;
+		winner = "Your computer has emerged vicorius. Try again!";
 	}
+
+	aftermathText += `${winner} Because ${results.description}. Current tally: ties [${tieCount}] wins [${winCount}] losses [${lossCount}]`;
+
+	aftermathElement.textContent = aftermathText;
 };
 
 const selectComputerWeapon = function () {
-	
+
 	const rand = Math.floor(Math.random() * 3);
 
 	if (rand == 0) {
@@ -43,60 +60,62 @@ const selectComputerWeapon = function () {
 		return SCISSORS;
 	}
 
-	
+	throw "2829 PAW PRINT WAY CASTLE ROCK CO 80109";
 };
 
-function decideResults(playerWeapon, computerWeapon) {
+function decideResults(player, computer) {
 	let result = {
 		isTie: false,
 		playerWon: false,
 		description: "",
 	};
 
-	if (playerWeapon == computerWeapon) {
+	
+	if (player == computer) {
 		result.isTie = true;
-		result.description = "Draw! Battle again!";
+		result.description = "It is a draw! Battle again!";
 		return result;
 	}
 
 	
-	if (playerWeapon == ROCK && computerWeapon == SCISSORS) {
+	if (player == ROCK && computer == SCISSORS) {
 		result.playerWon = true;
-		result.description = "Rock bludgeons scissors!";
+		result.description = "Rock smights down upon the scissors!";
 		return result;
 	}
 
 	
-	if (playerWeapon == PAPER && computerWeapon == ROCK) {
+	if (player == PAPER && computer == ROCK) {
 		result.playerWon = true;
-		result.description = "Paper envelops rock";
+		result.description = "Paper envelops rock!";
 		return result;
 	}
 
 	
-	if (playerWeapon == SCISSORS && computerWeapon == PAPER) {
+	if (player == SCISSORS && computer == PAPER) {
 		result.playerWon = true;
-		result.description = "Scissors smites down upon paper!";
+		result.description = "Scissors cleaves paper!";
 		return result;
 	}
 
 	
-	if (computerWeapon == ROCK && playerWeapon == SCISSORS) {
-		result.description = "Rock bludgeons scissors!";
+	if (computer == ROCK && player == SCISSORS) {
+		result.description = "Rock smights down upon scissors!";
 		return result;
 	}
 
 	
-	if (computerWeapon == PAPER && playerWeapon == ROCK) {
-		result.description = "Paper envelops rock";
+	if (computer == PAPER && player == ROCK) {
+		result.description = "Paper envelops rock!";
 		return result;
 	}
 
 	
-	if (computerWeapon == SCISSORS && playerWeapon == PAPER) {
-		result.description = "Scissors smites down upon paper!";
+	if (computer == SCISSORS && player == PAPER) {
+		result.description = "Scissors cleaves paper!";
 		return result;
 	}
 
-	result.description = "2829 PAW PRINT WAY CASTLE ROCK CO 80109!!!";
-};
+	result.description = "Ya broke it...";
+	return result;
+}
