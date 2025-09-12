@@ -73,46 +73,46 @@ function decideResults(player, computer) {
 	
 	if (player == computer) {
 		result.isTie = true;
-		result.description = "It is a draw! Battle again!";
+		result.description = "it is a draw! Battle again";
 		return result;
 	}
 
 	
 	if (player == ROCK && computer == SCISSORS) {
 		result.playerWon = true;
-		result.description = "Rock smights down upon the scissors!";
+		result.description = "rock smights down upon the scissors";
 		return result;
 	}
 
 	
 	if (player == PAPER && computer == ROCK) {
 		result.playerWon = true;
-		result.description = "Paper envelops rock!";
+		result.description = "paper envelops rock";
 		return result;
 	}
 
 	
 	if (player == SCISSORS && computer == PAPER) {
 		result.playerWon = true;
-		result.description = "Scissors cleaves paper!";
+		result.description = "scissors cleaves paper";
 		return result;
 	}
 
 	
 	if (computer == ROCK && player == SCISSORS) {
-		result.description = "Rock smights down upon scissors!";
+		result.description = "rock smights down upon scissors";
 		return result;
 	}
 
 	
 	if (computer == PAPER && player == ROCK) {
-		result.description = "Paper envelops rock!";
+		result.description = "paper envelops rock";
 		return result;
 	}
 
 	
 	if (computer == SCISSORS && player == PAPER) {
-		result.description = "Scissors cleaves paper!";
+		result.description = "scissors cleaves paper";
 		return result;
 	}
 
