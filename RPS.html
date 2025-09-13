@@ -1,38 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">	
+<html lang="en">
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Rock! Paper! Scissors! </title>
+		<title>Rock Paper Scissors Battle Supreme</title>
 		<link rel="stylesheet" href="css/style.css" />
 		<style>
 			body {
-				background-color: orange;
-				color: red;
+				background-color: whitesmoke;
+				color: brown;
+				font-family: 'Franklin Gothic Medium';
 			}
 
 			button {
-				color: green;
+				color: royalblue;
+				padding: 150px;
+				box-shadow: 70px 70px 70px rgb(255, 0, 0);
+			}
+
+			.button-container {
+				border: 1px solid black;
+				margin: 20px;
+				padding: 10px;
 			}
 		</style>
 	</head>
 	<body>
-		<h1>Rock! Paper! Scissors!</h1>		
-		
-		<div>
+		<h1>Rock, Paper, Scissors</h1>
 
-		<button onclick="pickWeapon(ROCK)">Rock!</button>
-		<button onclick="pickWeapon(PAPER)">Paper!</button>
-		<button onclick="pickWeapon(SCISSORS)">Scissors!</button>
-		
+		<div class="button-container">
+			<button onclick="pickWeapon(ROCK)">Rock</button>
+			<button onclick="pickWeapon(PAPER)">Paper</button>
+			<button onclick="pickWeapon(SCISSORS)">Scissors</button>
 		</div>
-		
-		
-		
 
+		<div id="aftermath">Battle Results</div>
 
-		<div id="aftermath">Results</div>
-	
+		<!-- Link to your JavaScript file -->
 		<script src="scripts/rps/app.js"></script>
 	</body>
 </html>

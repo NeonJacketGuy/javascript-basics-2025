@@ -16,8 +16,8 @@ if (aftermathElement == null) {
 }
 
 const pickWeapon = function (weapon) {
-	let aftermathText = `Player picked ${weapon}. `;
-	console.log("Player picked", weapon);
+	let aftermathText = `You picked ${weapon}. `;
+	console.log("You picked", weapon);
 
 	let computerWeapon = selectComputerWeapon();
 	console.log("Computer picked", computerWeapon);
