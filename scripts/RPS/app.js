@@ -36,7 +36,7 @@ const pickWeapon = function (weapon) {
 		winner = "You emerge vicorius!";
 	} else {
 		lossCount++;
-		winner = "Your computer has emerged vicorius. Try again!";
+		winner = "Your computer has emerged vicorius.";
 	}
 
 	aftermathText += `${winner} Because ${results.description}. Current tally: ties [${tieCount}] wins [${winCount}] losses [${lossCount}]`;
