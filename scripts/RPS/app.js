@@ -67,7 +67,7 @@ function decideResults(player, computer) {
 	let result = {
 		isTie: false,
 		playerWon: false,
-		description: "something went wrong",
+		description: "Something went wrong!",
 	};
 
 	
@@ -119,3 +119,15 @@ function decideResults(player, computer) {
 	result.description = "Ya broke it...";
 	return result;
 }
+
+let color = 0;
+
+function updateFrame() {
+color += 1;
+
+console.log(`Current value: ${color}`);
+
+requestAnimationFrame(updateFrame);
+}
+
+updateFrame();
