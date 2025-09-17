@@ -3,7 +3,9 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Rock Paper Scissors. A fight to the death over and over again.</title>
+		<title>
+			Rock Paper Scissors. A fight to the death over and over again.
+		</title>
 		<link rel="stylesheet" href="css/style.css" />
 		<style>
 			body {
@@ -14,39 +16,43 @@
 			}
 
 			button {
+				border: 5px solid orange;
+				border-radius: 20px;
+				padding: 80px 130px;
+				box-shadow: 6px 10px black;
+				margin: 10px;
 
-			border: 5px solid green;
-			border-radius: 20px;
-			padding: 80px 130px;
-			box-shadow:  6px 10px black;
-			margin: 10px;
+				font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
+				font-size: 50px;
+				color: yellow;
 
-			font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
-			font-size: 50px;
-			color: black;
-
-			background-color: blue;
-			cursor: pointer;
-			transition: background-color 0.2s ease, border-color 0.2s ease;
+				background-color: blue;
+				cursor: pointer;
+				transition: background-color 0.2s ease, border-color 0.2s ease;
 			}
 
 			button:active {
 				background-color: orange;
 				transform: translateY(2px);
 				border: 5px solid blue;
-				
-				box-shadow: 4px 8px black;
 
 				font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
-				font-size: 25px
-				 
+				font-size: 45px;
+				color: blue;
+
+				<div class="button-container">
+			<button onclick="pickWeapon(ROCK)">Rock</button>
+			<button onclick="pickWeapon(PAPER)">Paper</button>
+			<button onclick="pickWeapon(SCISSORS)">Scissors</button>
+		</div>
+
 			}
-	
 
 			.button-container {
 				border: 0px solid white;
 				margin: 20px;
 				padding: 10px;
+
 			}
 		</style>
 	</head>
