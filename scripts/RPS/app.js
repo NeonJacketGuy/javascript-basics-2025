@@ -120,12 +120,16 @@ function decideResults(player, computer) {
 	return result;
 }
 
-let color = 0;
+let hue = 0;
 
 function updateFrame() {
-color += 1;
+hue = (hue + 500) % 360;
 
-console.log(`Current value: ${color}`);
+const color = `hsl(${hue}, 100%, 50%)`;
+
+console.log(`Current value: ${hue}`);
+
+document.body.style.backgroundColor = color;
 
 requestAnimationFrame(updateFrame);
 }
