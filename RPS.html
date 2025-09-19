@@ -39,7 +39,6 @@
 				font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
 				font-size: 45px;
 				color: blue;
-
 			}
 
 			.button-container {
@@ -53,9 +52,11 @@
 		<h1>Rock! Paper! Scissors!</h1>
 
 		<div class="button-container">
-			<button onclick="pickWeapon(ROCK)">Rock</button>
-			<button onclick="pickWeapon(PAPER)">Paper</button>
-			<button onclick="pickWeapon(SCISSORS)">Scissors</button>
+			<button id="rock" onclick="pickWeapon(ROCK)">Rock</button>
+			<button id="paper" onclick="pickWeapon(PAPER)">Paper</button>
+			<button id="scissors" onclick="pickWeapon(SCISSORS)">
+				Scissors
+			</button>
 		</div>
 
 		<div id="aftermath">Aftermath</div>

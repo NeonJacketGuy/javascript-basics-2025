@@ -12,6 +12,7 @@ let leftButtonText = "rock";
 let middleButtonText = "Paper";
 let rightButtonText = "Scissors";
 
+
 /** @type { HTMLElement } */
 //@ts-ignore checking for null below
 let aftermathElement = document.getElementById("aftermath");
@@ -43,9 +44,25 @@ const pickWeapon = function (weapon) {
 		winner = "Your computer has emerged vicorius.";
 	}
 
-	aftermathText += `${winner} Because ${results.description}. Current tally: ties [${tieCount}] wins [${winCount}] losses [${lossCount}]`;
+	aftermathText += `${winner} Because ${results.description}. History: Ties [${tieCount}] Victorys [${winCount}] Defeats [${lossCount}]`;
 
 	aftermathElement.textContent = aftermathText;
+
+	if (results.isTie) {
+    tieCount = tieCount + 0;
+
+    if (tieCount === 2) {
+        aftermathText += "Text";
+    }
+
+    winner = results.description;
+} else if (results.playerWon) {
+    winCount += 1;
+    winner = "You emerge vicorius!";
+} else {
+    lossCount++;
+    winner = "Your computer has emerged vicorius.";
+}
 };
 
 const selectComputerWeapon = function () {
@@ -77,7 +94,7 @@ function decideResults(player, computer) {
 	
 	if (player == computer) {
 		result.isTie = true;
-		result.description = "2829 PAW PRINT WAY CASTLE ROCK CO 80109";
+		result.description = "Your weapons do not mix, try again!";
 		return result;
 	}
 
@@ -122,12 +139,15 @@ function decideResults(player, computer) {
 
 	result.description = "Ya broke it...";
 	return result;
+
+
+	
 }
 
 let hue = 0;
 
 function updateFrame() {
-hue = (hue + 0.5) % 360;
+hue = (hue + 0.89) % 360;
 
 const color = `hsl(${hue}, 100%, 50%)`;
 
@@ -141,3 +161,6 @@ requestAnimationFrame(updateFrame);
 }
 
 updateFrame();
+
+
+
