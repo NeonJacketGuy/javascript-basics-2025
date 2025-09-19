@@ -8,6 +8,10 @@ let tieCount = 0;
 let winCount = 0;
 let lossCount = 0;
 
+let leftButtonText = "rock";
+let middleButtonText = "Paper";
+let rightButtonText = "Scissors";
+
 /** @type { HTMLElement } */
 //@ts-ignore checking for null below
 let aftermathElement = document.getElementById("aftermath");
@@ -130,6 +134,8 @@ const color = `hsl(${hue}, 100%, 50%)`;
 console.log(`Current value: ${hue}`);
 
 document.body.style.backgroundColor = color;
+
+
 
 requestAnimationFrame(updateFrame);
 }
