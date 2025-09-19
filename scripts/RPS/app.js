@@ -123,7 +123,7 @@ function decideResults(player, computer) {
 let hue = 0;
 
 function updateFrame() {
-hue = (hue + 1) % 360;
+hue = (hue + 0.1) % 360;
 
 const color = `hsl(${hue}, 100%, 50%)`;
 
