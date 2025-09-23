@@ -4,10 +4,16 @@
 //@ts-ignore
 const canvas = document.getElementById("game-canvas");
 
-const ctx = canvas.getContext("2d");
+/** @type { CanvasRenderingContext2D } */
+//@ts-ignore 
+const CTX = canvas.getContext("2d");
 
 const HEIGHT = 600;
 const WIDTH = 800;
 
 canvas.height = HEIGHT;
 canvas.width = WIDTH
+
+
+CTX.fillStyle = "orange";
+CTX.fillRect(0, 0, 50, 50);
