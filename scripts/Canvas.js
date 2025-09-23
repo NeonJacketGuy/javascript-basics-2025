@@ -16,4 +16,12 @@ canvas.width = WIDTH
 
 
 CTX.fillStyle = "orange";
-CTX.fillRect(0, 0, 50, 50);
+CTX.fillRect(0, 0, WIDTH, HEIGHT);
+
+CTX.fillStyle = "blue";
+CTX.fillRect(0, 0, 10, 50);
+
+CTX.fillStyle = "green";
+CTX.arc(WIDTH / 2, HEIGHT / 2, 100, 0, 2 * Math.PI,);
+CTX.fill();
+
