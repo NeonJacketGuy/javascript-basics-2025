@@ -17,6 +17,7 @@
 			}
 
 			.game-container {
+				position: relative;
 				border: 5px solid #fff;
 				box-shadow: 0 0 30px #00ffff;
 			}
@@ -25,18 +26,49 @@
 				background: #000;
 				display: block;
 			}
+
+			#pause-menu {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				background-color: rgba(0, 0, 0, 0.7);
+				color: #fff;
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				align-items: center;
+				font-size: 2em;
+				text-align: center;
+				pointer-events: none; /* Allows canvas events to pass through */
+			}
+
+			#pause-text {
+				padding: 20px;
+				border: 2px solid #fff;
+				box-shadow: 0 0 15px #fff;
+			}
+
+			.hidden {
+				display: none;
+			}
 		</style>
 	</head>
 	<body>
 		<div class="game-container">
 			<canvas id="gameCanvas" width="900" height="740"></canvas>
+			<div id="pause-menu" class="hidden">
+				<div id="pause-text">PAUSED<br />(Press ESC to resume)</div>
+			</div>
 		</div>
 		<script>
 			const canvas = document.getElementById("gameCanvas");
 			const ctx = canvas.getContext("2d");
+			const pauseMenu = document.getElementById("pause-menu");
 
 			// Game variables
-			const ballRadius = 6; // Smaller ball
+			const ballRadius = 6;
 			let x = canvas.width / 2;
 			let y = canvas.height - 30;
 			let dx = 3;
@@ -46,15 +78,18 @@
 			let paddleX = (canvas.width - paddleWidth) / 2;
 			let score = 0;
 			let lives = 3;
+			let isPaused = false;
+
+			// Keyboard control variables
+			let rightPressed = false;
+			let leftPressed = false;
 
 			// Brick variables
-			const brickWidth = 35; // Smaller brick width
+			const brickWidth = 35;
 			const brickHeight = 15;
-			const brickPadding = 5; // Smaller padding
+			const brickPadding = 5;
 			const brickOffsetTop = 40;
 			const brickOffsetLeft = 10;
-
-			// Calculate brick columns and rows based on canvas size
 			const brickColumnCount = Math.floor(
 				(canvas.width - 2 * brickOffsetLeft) /
 					(brickWidth + brickPadding)
@@ -73,13 +108,31 @@
 				}
 			}
 
-			// Event listener for paddle movement
-			document.addEventListener("mousemove", mouseMoveHandler, false);
+			// Event listeners for keyboard
+			document.addEventListener("keydown", keyDownHandler, false);
+			document.addEventListener("keyup", keyUpHandler, false);
 
-			function mouseMoveHandler(e) {
-				const relativeX = e.clientX - canvas.offsetLeft;
-				if (relativeX > 0 && relativeX < canvas.width) {
-					paddleX = relativeX - paddleWidth / 2;
+			function keyDownHandler(e) {
+				if (e.key === "Right" || e.key === "ArrowRight") {
+					rightPressed = true;
+				} else if (e.key === "Left" || e.key === "ArrowLeft") {
+					leftPressed = true;
+				} else if (e.key === "Escape") {
+					isPaused = !isPaused; // Toggle pause state
+					if (isPaused) {
+						pauseMenu.classList.remove("hidden");
+					} else {
+						pauseMenu.classList.add("hidden");
+						draw(); // Resume the game loop
+					}
+				}
+			}
+
+			function keyUpHandler(e) {
+				if (e.key === "Right" || e.key === "ArrowRight") {
+					rightPressed = false;
+				} else if (e.key === "Left" || e.key === "ArrowLeft") {
+					leftPressed = false;
 				}
 			}
 
@@ -87,7 +140,7 @@
 			function drawBall() {
 				ctx.beginPath();
 				ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
-				ctx.fillStyle = "#ff6347"; // Tomato color
+				ctx.fillStyle = "#ff6347";
 				ctx.fill();
 				ctx.closePath();
 			}
@@ -101,7 +154,7 @@
 					paddleWidth,
 					paddleHeight
 				);
-				ctx.fillStyle = "#00ffff"; // Cyan color
+				ctx.fillStyle = "#00ffff";
 				ctx.fill();
 				ctx.closePath();
 			}
@@ -123,7 +176,7 @@
 							ctx.rect(brickX, brickY, brickWidth, brickHeight);
 							ctx.fillStyle = `hsl(${
 								(r / brickRowCount) * 360
-							}, 80%, 60%)`; // Color bricks by row
+							}, 80%, 60%)`;
 							ctx.fill();
 							ctx.closePath();
 						}
@@ -175,41 +228,53 @@
 
 			// Main game loop
 			function draw() {
-				ctx.clearRect(0, 0, canvas.width, canvas.height);
-				drawBricks();
-				drawBall();
-				drawPaddle();
-				drawScore();
-				drawLives();
-				collisionDetection();
+				if (!isPaused) {
+					ctx.clearRect(0, 0, canvas.width, canvas.height);
+					drawBricks();
+					drawBall();
+					drawPaddle();
+					drawScore();
+					drawLives();
+					collisionDetection();
 
-				// Wall collision logic
-				if (x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
-					dx = -dx;
-				}
-				if (y + dy < ballRadius) {
-					dy = -dy;
-				} else if (y + dy > canvas.height - ballRadius) {
-					if (x > paddleX && x < paddleX + paddleWidth) {
+					// Wall collision logic
+					if (
+						x + dx > canvas.width - ballRadius ||
+						x + dx < ballRadius
+					) {
+						dx = -dx;
+					}
+					if (y + dy < ballRadius) {
 						dy = -dy;
-					} else {
-						lives--;
-						if (!lives) {
-							alert("Game Over! Try again!");
-							document.location.reload();
+					} else if (y + dy > canvas.height - ballRadius) {
+						if (x > paddleX && x < paddleX + paddleWidth) {
+							dy = -dy;
 						} else {
-							x = canvas.width / 2;
-							y = canvas.height - 30;
-							dx = 3;
-							dy = -3;
-							paddleX = (canvas.width - paddleWidth) / 2;
+							lives--;
+							if (!lives) {
+								alert("Game Over! Try again!");
+								document.location.reload();
+							} else {
+								x = canvas.width / 2;
+								y = canvas.height - 30;
+								dx = 3;
+								dy = -3;
+								paddleX = (canvas.width - paddleWidth) / 2;
+							}
 						}
 					}
-				}
 
-				// Move ball
-				x += dx;
-				y += dy;
+					// Paddle movement logic
+					if (rightPressed && paddleX < canvas.width - paddleWidth) {
+						paddleX += 7;
+					} else if (leftPressed && paddleX > 0) {
+						paddleX -= 7;
+					}
+
+					// Move ball
+					x += dx;
+					y += dy;
+				}
 
 				requestAnimationFrame(draw);
 			}
