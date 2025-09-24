@@ -19,9 +19,20 @@ CTX.fillStyle = "orange";
 CTX.fillRect(0, 0, WIDTH, HEIGHT);
 
 CTX.fillStyle = "blue";
-CTX.fillRect(0, 0, 10, 50);
+CTX.fillRect(0, 0, 200, 600);
+
+CTX.fillStyle = "blue";
+CTX.fillRect(600, 0, 200, 600);
 
 CTX.fillStyle = "green";
 CTX.arc(WIDTH / 2, HEIGHT / 2, 100, 0, 2 * Math.PI,);
 CTX.fill();
+
+function drawLoop(timestamp) {
+    console.log(timestamp);
+
+    requestAnimationFrame(drawLoop);
+}
+
+requestAnimationFrame(drawLoop);
 

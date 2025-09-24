@@ -11,13 +11,14 @@
 				align-items: center;
 				height: 100vh;
 				margin: 0;
-				background-color: #333;
-				font-family: Arial, sans-serif;
+				background-color: #1a1a1a;
+				font-family: "Courier New", Courier, monospace;
+				color: #fff;
 			}
 
 			.game-container {
 				border: 5px solid #fff;
-				box-shadow: 0 0 20px #fff;
+				box-shadow: 0 0 30px #00ffff;
 			}
 
 			canvas {
@@ -28,32 +29,40 @@
 	</head>
 	<body>
 		<div class="game-container">
-			<canvas id="gameCanvas" width="480" height="320"></canvas>
+			<canvas id="gameCanvas" width="900" height="740"></canvas>
 		</div>
 		<script>
 			const canvas = document.getElementById("gameCanvas");
 			const ctx = canvas.getContext("2d");
 
 			// Game variables
-			let ballRadius = 10;
+			const ballRadius = 6; // Smaller ball
 			let x = canvas.width / 2;
 			let y = canvas.height - 30;
-			let dx = 2;
-			let dy = -2;
-			let paddleHeight = 10;
-			let paddleWidth = 75;
+			let dx = 3;
+			let dy = -3;
+			const paddleHeight = 10;
+			const paddleWidth = 85;
 			let paddleX = (canvas.width - paddleWidth) / 2;
-			let rightPressed = false;
-			let leftPressed = false;
-			let brickRowCount = 5;
-			let brickColumnCount = 8;
-			let brickWidth = 50;
-			let brickHeight = 15;
-			let brickPadding = 10;
-			let brickOffsetTop = 30;
-			let brickOffsetLeft = 30;
 			let score = 0;
 			let lives = 3;
+
+			// Brick variables
+			const brickWidth = 35; // Smaller brick width
+			const brickHeight = 15;
+			const brickPadding = 5; // Smaller padding
+			const brickOffsetTop = 40;
+			const brickOffsetLeft = 10;
+
+			// Calculate brick columns and rows based on canvas size
+			const brickColumnCount = Math.floor(
+				(canvas.width - 2 * brickOffsetLeft) /
+					(brickWidth + brickPadding)
+			);
+			const brickRowCount = Math.floor(
+				(canvas.height * 0.4 - brickOffsetTop) /
+					(brickHeight + brickPadding)
+			);
 
 			// Brick layout
 			const bricks = [];
@@ -64,7 +73,7 @@
 				}
 			}
 
-			// Event listeners for paddle movement
+			// Event listener for paddle movement
 			document.addEventListener("mousemove", mouseMoveHandler, false);
 
 			function mouseMoveHandler(e) {
@@ -92,7 +101,7 @@
 					paddleWidth,
 					paddleHeight
 				);
-				ctx.fillStyle = "#0095DD"; // Blue
+				ctx.fillStyle = "#00ffff"; // Cyan color
 				ctx.fill();
 				ctx.closePath();
 			}
@@ -112,7 +121,9 @@
 							bricks[c][r].y = brickY;
 							ctx.beginPath();
 							ctx.rect(brickX, brickY, brickWidth, brickHeight);
-							ctx.fillStyle = "#f0e68c"; // Khaki color
+							ctx.fillStyle = `hsl(${
+								(r / brickRowCount) * 360
+							}, 80%, 60%)`; // Color bricks by row
 							ctx.fill();
 							ctx.closePath();
 						}
@@ -139,7 +150,7 @@
 									score ===
 									brickRowCount * brickColumnCount
 								) {
-									alert("YOU WIN, CONGRATULATIONS!");
+									alert("Victory Royal! Congratulations!");
 									document.location.reload();
 								}
 							}
@@ -150,16 +161,16 @@
 
 			// Draw the score
 			function drawScore() {
-				ctx.font = "16px Arial";
-				ctx.fillStyle = "#f0e68c";
-				ctx.fillText(`Score: ${score}`, 8, 20);
+				ctx.font = "18px 'Courier New'";
+				ctx.fillStyle = "#00ffff";
+				ctx.fillText(`Score: ${score}`, 8, 25);
 			}
 
 			// Draw the lives counter
 			function drawLives() {
-				ctx.font = "16px Arial";
-				ctx.fillStyle = "#f0e68c";
-				ctx.fillText(`Lives: ${lives}`, canvas.width - 65, 20);
+				ctx.font = "18px 'Courier New'";
+				ctx.fillStyle = "#ff6347";
+				ctx.fillText(`Lives: ${lives}`, canvas.width - 90, 25);
 			}
 
 			// Main game loop
@@ -184,7 +195,7 @@
 					} else {
 						lives--;
 						if (!lives) {
-							alert("GAME OVER");
+							alert("Game Over! Try again!");
 							document.location.reload();
 						} else {
 							x = canvas.width / 2;
