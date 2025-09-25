@@ -32,7 +32,8 @@
 			<canvas id="gameCanvas" width="400" height="600"></canvas>
 			<div id="game-controls">
 				<h2>Controls</h2>
-				<p>Use the **left** and **right** arrow keys to steer.</p>
+				<p>Use the **A** and **D** keys to steer.</p>
+				<p>Use the **W** key to speed up.</p>
 				<p>Try to avoid the oncoming cars!</p>
 				<p>**Press 'R' to restart** after a crash.</p>
 			</div>
@@ -45,8 +46,11 @@
 			const LANE_WIDTH = ROAD_WIDTH / 3;
 			const CAR_WIDTH = 40;
 			const CAR_HEIGHT = 60;
-			const ROAD_SPEED = 5;
-			const PLAYER_SPEED = 5;
+			const NORMAL_ROAD_SPEED = 10;
+			const BOOST_ROAD_SPEED = 20;
+			const PLAYER_SPEED = 12;
+
+			let ROAD_SPEED = NORMAL_ROAD_SPEED;
 
 			let player = {
 				x: canvas.width / 2 - CAR_WIDTH / 2,
@@ -63,20 +67,27 @@
 
 			document.addEventListener("keydown", (e) => {
 				if (!gameOver) {
-					if (e.key === "ArrowLeft") {
+					if (e.key.toLowerCase() === "a") {
 						player.speedX = -PLAYER_SPEED;
-					} else if (e.key === "ArrowRight") {
+					} else if (e.key.toLowerCase() === "d") {
 						player.speedX = PLAYER_SPEED;
+					} else if (e.key.toLowerCase() === "w") {
+						ROAD_SPEED = BOOST_ROAD_SPEED;
 					}
 				}
-				if (e.key === "r" && gameOver) {
+				if (e.key.toLowerCase() === "r" && gameOver) {
 					restartGame();
 				}
 			});
 
 			document.addEventListener("keyup", (e) => {
-				if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+				if (
+					e.key.toLowerCase() === "a" ||
+					e.key.toLowerCase() === "d"
+				) {
 					player.speedX = 0;
+				} else if (e.key.toLowerCase() === "w") {
+					ROAD_SPEED = NORMAL_ROAD_SPEED;
 				}
 			});
 
@@ -107,7 +118,7 @@
 					otherCars[i].y += ROAD_SPEED;
 				}
 
-				if (Math.random() < 0.02) {
+				if (Math.random() < 0.02 * (ROAD_SPEED / NORMAL_ROAD_SPEED)) {
 					const lane = Math.floor(Math.random() * 3);
 					const x =
 						(canvas.width - ROAD_WIDTH) / 2 +
@@ -204,6 +215,7 @@
 				otherCars = [];
 				score = 0;
 				gameOver = false;
+				ROAD_SPEED = NORMAL_ROAD_SPEED;
 			}
 
 			gameLoop();
