@@ -32,18 +32,25 @@ let currentTimestamp = 0;
 let x = 0;
 let y = 0;
 
+let box = {
+    x: 0,
+    y: 0,
+    width: 10,
+    draw: function() {
+        CTX.fillStyle = "green";
+        CTX.fillRect(this.x, this.y, this.width, this.width);
+    }
+};
+
 function drawLoop(timestamp) {
     //CTX.clearRect(0, 0, WIDTH, HEIGHT)
     let elapsedTime = timestamp - currentTimestamp;
     currentTimestamp = timestamp;
+
+    box.draw();
+    box.x++;
+    box.y++;
     
-    CTX.fillStyle = "green";
-    CTX.fillRect(x, y, 10, 10);
-
-    x++;
-    y++;
-
-    //console.log(elapsedTime);
     requestAnimationFrame(drawLoop);
 }
 
