@@ -18,27 +18,12 @@
 				background-color: #555;
 				border: 2px solid white;
 			}
-			#game-controls {
-				margin-left: 20px;
-			}
-			#game-controls h2 {
-				margin-top: 0;
-			}
 		</style>
 	</head>
 	<body>
 		<div>
 			<h1>Simple Driving Game</h1>
 			<canvas id="gameCanvas" width="400" height="600"></canvas>
-			<div id="game-controls">
-				<h2>Controls</h2>
-				<p>Use the **A** and **D** keys to steer.</p>
-				<p>Use the **W** key to speed up.</p>
-				<p>Use the **S** key to slow down.</p>
-				<p>Try to avoid the oncoming cars!</p>
-				<p>**Press 'R' to restart** after a crash.</p>
-				<p>**Press 'ESC' to pause/unpause**.</p>
-			</div>
 		</div>
 		<script>
 			const canvas = document.getElementById("gameCanvas");
@@ -49,10 +34,13 @@
 			const CAR_WIDTH = 40;
 			const CAR_HEIGHT = 60;
 			const NORMAL_ROAD_SPEED = 10;
-			const BOOST_ROAD_SPEED = 20;
+			const BOOST_ROAD_SPEED = 50;
 			const SLOW_ROAD_SPEED = 4;
+			const PLAYER_SPEED = 5;
 
 			let ROAD_SPEED = NORMAL_ROAD_SPEED;
+			let isInvincible = false;
+			let invincibilityTimerId = null;
 
 			let player = {
 				x: canvas.width / 2 - CAR_WIDTH / 2,
@@ -64,14 +52,15 @@
 			};
 
 			let otherCars = [];
+			let powerUps = [];
 			let score = 0;
 			let gameOver = false;
-			let isPaused = false; // New variable to track pause state
-			let animationFrameId; // New variable to store the requestAnimationFrame ID
+			let isPaused = false;
+			let animationFrameId;
 
 			document.addEventListener("keydown", (e) => {
 				if (e.key === "Escape") {
-					togglePause(); // Call the toggle pause function on ESC key press
+					togglePause();
 				}
 
 				if (!gameOver && !isPaused) {
@@ -107,7 +96,15 @@
 			});
 
 			function drawPlayer() {
-				ctx.fillStyle = player.color;
+				if (isInvincible) {
+					if (Math.floor(Date.now() / 100) % 2 === 0) {
+						ctx.fillStyle = player.color;
+					} else {
+						ctx.fillStyle = "white";
+					}
+				} else {
+					ctx.fillStyle = player.color;
+				}
 				ctx.fillRect(player.x, player.y, player.width, player.height);
 			}
 
@@ -115,6 +112,21 @@
 				otherCars.forEach((car) => {
 					ctx.fillStyle = car.color;
 					ctx.fillRect(car.x, car.y, car.width, car.height);
+				});
+			}
+
+			function drawPowerUps() {
+				powerUps.forEach((powerUp) => {
+					ctx.fillStyle = "white";
+					ctx.beginPath();
+					ctx.arc(
+						powerUp.x + powerUp.width / 2,
+						powerUp.y + powerUp.height / 2,
+						powerUp.width / 2,
+						0,
+						2 * Math.PI
+					);
+					ctx.fill();
 				});
 			}
 
@@ -130,7 +142,14 @@
 
 			function updateOtherCars() {
 				for (let i = 0; i < otherCars.length; i++) {
-					otherCars[i].y += ROAD_SPEED;
+					const car = otherCars[i];
+					car.y += ROAD_SPEED;
+
+					if (car.isSwerving) {
+						const swerveSpeed = 0.5;
+						car.x += swerveSpeed * Math.sin(car.swerveTime);
+						car.swerveTime += 0.05;
+					}
 				}
 
 				if (Math.random() < 0.02 * (ROAD_SPEED / NORMAL_ROAD_SPEED)) {
@@ -142,19 +161,80 @@
 					const colors = ["red", "yellow", "green"];
 					const color =
 						colors[Math.floor(Math.random() * colors.length)];
+					const isSwerving = Math.random() < 0.3;
 					otherCars.push({
 						x,
 						y: -CAR_HEIGHT,
 						width: CAR_WIDTH,
 						height: CAR_HEIGHT,
 						color,
+						isSwerving,
+						swerveTime: isSwerving
+							? Math.random() * 2 * Math.PI
+							: 0,
 					});
 				}
 
 				otherCars = otherCars.filter((car) => car.y < canvas.height);
 			}
 
+			function updatePowerUps() {
+				for (let i = 0; i < powerUps.length; i++) {
+					powerUps[i].y += ROAD_SPEED;
+				}
+
+				if (Math.random() < 0.005) {
+					const lane = Math.floor(Math.random() * 3);
+					const x =
+						(canvas.width - ROAD_WIDTH) / 2 +
+						lane * LANE_WIDTH +
+						(LANE_WIDTH - CAR_WIDTH) / 2;
+					powerUps.push({
+						x,
+						y: -CAR_HEIGHT,
+						width: CAR_WIDTH,
+						height: CAR_HEIGHT,
+					});
+				}
+
+				powerUps = powerUps.filter(
+					(powerUp) => powerUp.y < canvas.height
+				);
+			}
+
+			function checkPowerUpCollision() {
+				for (let i = powerUps.length - 1; i >= 0; i--) {
+					const powerUp = powerUps[i];
+					const playerCenterX = player.x + player.width / 2;
+					const playerCenterY = player.y + player.height / 2;
+					const powerUpCenterX = powerUp.x + powerUp.width / 2;
+					const powerUpCenterY = powerUp.y + powerUp.height / 2;
+					const dx = playerCenterX - powerUpCenterX;
+					const dy = playerCenterY - powerUpCenterY;
+					const distance = Math.sqrt(dx * dx + dy * dy);
+
+					if (distance < powerUp.width / 2 + player.width / 2) {
+						activateInvincibility();
+						powerUps.splice(i, 1);
+					}
+				}
+			}
+
+			function activateInvincibility() {
+				if (invincibilityTimerId) {
+					clearTimeout(invincibilityTimerId);
+				}
+				isInvincible = true;
+				invincibilityTimerId = setTimeout(() => {
+					isInvincible = false;
+					invincibilityTimerId = null;
+				}, 15000);
+			}
+
 			function checkCollision() {
+				if (isInvincible) {
+					return;
+				}
 				otherCars.forEach((car) => {
 					if (
 						player.x < car.x + car.width &&
@@ -171,11 +251,17 @@
 				ctx.fillStyle = "white";
 				ctx.font = "24px Arial";
 				ctx.fillText("Score: " + score, 10, 30);
+				if (isInvincible) {
+					ctx.fillStyle = "white";
+					ctx.font = "20px Arial";
+					ctx.fillText("INVINCIBLE", canvas.width - 150, 30);
+				}
 			}
 
 			function drawGameOver() {
 				ctx.fillStyle = "white";
 				ctx.font = "40px Arial";
+				ctx.textAlign = "center";
 				ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2);
 				ctx.font = "20px Arial";
 				ctx.fillText(
@@ -183,20 +269,29 @@
 					canvas.width / 2,
 					canvas.height / 2 + 40
 				);
+				ctx.textAlign = "left";
 			}
 
 			function drawPauseMessage() {
-				ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; // Semi-transparent overlay
+				ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
 				ctx.fillRect(0, 0, canvas.width, canvas.height);
 				ctx.fillStyle = "white";
 				ctx.font = "40px Arial";
-				ctx.fillText("Paused", canvas.width / 2, canvas.height / 2);
+				ctx.textAlign = "center";
+				ctx.fillText(
+					"Your game is Paused",
+					canvas.width / 2,
+					canvas.height / 2
+				);
+				ctx.textAlign = "left";
 			}
 
 			function updateGame() {
 				if (!gameOver) {
 					updatePlayer();
 					updateOtherCars();
+					updatePowerUps();
+					checkPowerUpCollision();
 					checkCollision();
 					score++;
 				}
@@ -212,13 +307,15 @@
 				ctx.fillStyle = "white";
 				for (let i = 0; i < 6; i++) {
 					const lineY =
-						(i * 100 + ((score * 2) % 200)) % canvas.height;
+						(i * 100 + ((score * (ROAD_SPEED * 0.2)) % 200)) %
+						canvas.height;
 					ctx.fillRect(roadLeft + LANE_WIDTH, lineY, 5, 50);
 					ctx.fillRect(roadLeft + 2 * LANE_WIDTH, lineY, 5, 50);
 				}
 
 				drawPlayer();
 				drawOtherCars();
+				drawPowerUps();
 				drawScore();
 
 				if (gameOver) {
@@ -245,10 +342,16 @@
 				player.x = canvas.width / 2 - CAR_WIDTH / 2;
 				player.speedX = 0;
 				otherCars = [];
+				powerUps = [];
 				score = 0;
 				gameOver = false;
 				isPaused = false;
 				ROAD_SPEED = NORMAL_ROAD_SPEED;
+				isInvincible = false;
+				if (invincibilityTimerId) {
+					clearTimeout(invincibilityTimerId);
+					invincibilityTimerId = null;
+				}
 				if (animationFrameId) {
 					cancelAnimationFrame(animationFrameId);
 				}
