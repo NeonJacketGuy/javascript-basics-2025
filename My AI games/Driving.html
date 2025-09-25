@@ -34,8 +34,10 @@
 				<h2>Controls</h2>
 				<p>Use the **A** and **D** keys to steer.</p>
 				<p>Use the **W** key to speed up.</p>
+				<p>Use the **S** key to slow down.</p>
 				<p>Try to avoid the oncoming cars!</p>
 				<p>**Press 'R' to restart** after a crash.</p>
+				<p>**Press 'ESC' to pause/unpause**.</p>
 			</div>
 		</div>
 		<script>
@@ -48,7 +50,7 @@
 			const CAR_HEIGHT = 60;
 			const NORMAL_ROAD_SPEED = 10;
 			const BOOST_ROAD_SPEED = 20;
-			const PLAYER_SPEED = 12;
+			const SLOW_ROAD_SPEED = 4;
 
 			let ROAD_SPEED = NORMAL_ROAD_SPEED;
 
@@ -64,15 +66,23 @@
 			let otherCars = [];
 			let score = 0;
 			let gameOver = false;
+			let isPaused = false; // New variable to track pause state
+			let animationFrameId; // New variable to store the requestAnimationFrame ID
 
 			document.addEventListener("keydown", (e) => {
-				if (!gameOver) {
+				if (e.key === "Escape") {
+					togglePause(); // Call the toggle pause function on ESC key press
+				}
+
+				if (!gameOver && !isPaused) {
 					if (e.key.toLowerCase() === "a") {
 						player.speedX = -PLAYER_SPEED;
 					} else if (e.key.toLowerCase() === "d") {
 						player.speedX = PLAYER_SPEED;
 					} else if (e.key.toLowerCase() === "w") {
 						ROAD_SPEED = BOOST_ROAD_SPEED;
+					} else if (e.key.toLowerCase() === "s") {
+						ROAD_SPEED = SLOW_ROAD_SPEED;
 					}
 				}
 				if (e.key.toLowerCase() === "r" && gameOver) {
@@ -81,13 +91,18 @@
 			});
 
 			document.addEventListener("keyup", (e) => {
-				if (
-					e.key.toLowerCase() === "a" ||
-					e.key.toLowerCase() === "d"
-				) {
-					player.speedX = 0;
-				} else if (e.key.toLowerCase() === "w") {
-					ROAD_SPEED = NORMAL_ROAD_SPEED;
+				if (!isPaused) {
+					if (
+						e.key.toLowerCase() === "a" ||
+						e.key.toLowerCase() === "d"
+					) {
+						player.speedX = 0;
+					} else if (
+						e.key.toLowerCase() === "w" ||
+						e.key.toLowerCase() === "s"
+					) {
+						ROAD_SPEED = NORMAL_ROAD_SPEED;
+					}
 				}
 			});
 
@@ -170,6 +185,14 @@
 				);
 			}
 
+			function drawPauseMessage() {
+				ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; // Semi-transparent overlay
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				ctx.fillStyle = "white";
+				ctx.font = "40px Arial";
+				ctx.fillText("Paused", canvas.width / 2, canvas.height / 2);
+			}
+
 			function updateGame() {
 				if (!gameOver) {
 					updatePlayer();
@@ -204,9 +227,18 @@
 			}
 
 			function gameLoop() {
-				updateGame();
-				drawGame();
-				requestAnimationFrame(gameLoop);
+				if (!isPaused) {
+					updateGame();
+					drawGame();
+				} else {
+					drawPauseMessage();
+				}
+
+				animationFrameId = requestAnimationFrame(gameLoop);
+			}
+
+			function togglePause() {
+				isPaused = !isPaused;
 			}
 
 			function restartGame() {
@@ -215,7 +247,12 @@
 				otherCars = [];
 				score = 0;
 				gameOver = false;
+				isPaused = false;
 				ROAD_SPEED = NORMAL_ROAD_SPEED;
+				if (animationFrameId) {
+					cancelAnimationFrame(animationFrameId);
+				}
+				gameLoop();
 			}
 
 			gameLoop();
