@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Driving Game</title>
+		<style>
+			body {
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				height: 100vh;
+				margin: 0;
+				background-color: #333;
+				font-family: sans-serif;
+				color: white;
+				text-align: center;
+			}
+			canvas {
+				background-color: #555;
+				border: 2px solid white;
+			}
+			#game-controls {
+				margin-left: 20px;
+			}
+			#game-controls h2 {
+				margin-top: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<div>
+			<h1>Simple Driving Game</h1>
+			<canvas id="gameCanvas" width="400" height="600"></canvas>
+			<div id="game-controls">
+				<h2>Controls</h2>
+				<p>Use the **left** and **right** arrow keys to steer.</p>
+				<p>Try to avoid the oncoming cars!</p>
+				<p>**Press 'R' to restart** after a crash.</p>
+			</div>
+		</div>
+		<script>
+			const canvas = document.getElementById("gameCanvas");
+			const ctx = canvas.getContext("2d");
+
+			const ROAD_WIDTH = 300;
+			const LANE_WIDTH = ROAD_WIDTH / 3;
+			const CAR_WIDTH = 40;
+			const CAR_HEIGHT = 60;
+			const ROAD_SPEED = 5;
+			const PLAYER_SPEED = 5;
+
+			let player = {
+				x: canvas.width / 2 - CAR_WIDTH / 2,
+				y: canvas.height - CAR_HEIGHT - 20,
+				width: CAR_WIDTH,
+				height: CAR_HEIGHT,
+				speedX: 0,
+				color: "blue",
+			};
+
+			let otherCars = [];
+			let score = 0;
+			let gameOver = false;
+
+			document.addEventListener("keydown", (e) => {
+				if (!gameOver) {
+					if (e.key === "ArrowLeft") {
+						player.speedX = -PLAYER_SPEED;
+					} else if (e.key === "ArrowRight") {
+						player.speedX = PLAYER_SPEED;
+					}
+				}
+				if (e.key === "r" && gameOver) {
+					restartGame();
+				}
+			});
+
+			document.addEventListener("keyup", (e) => {
+				if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+					player.speedX = 0;
+				}
+			});
+
+			function drawPlayer() {
+				ctx.fillStyle = player.color;
+				ctx.fillRect(player.x, player.y, player.width, player.height);
+			}
+
+			function drawOtherCars() {
+				otherCars.forEach((car) => {
+					ctx.fillStyle = car.color;
+					ctx.fillRect(car.x, car.y, car.width, car.height);
+				});
+			}
+
+			function updatePlayer() {
+				player.x += player.speedX;
+				if (player.x < (canvas.width - ROAD_WIDTH) / 2) {
+					player.x = (canvas.width - ROAD_WIDTH) / 2;
+				}
+				if (player.x + player.width > (canvas.width + ROAD_WIDTH) / 2) {
+					player.x = (canvas.width + ROAD_WIDTH) / 2 - player.width;
+				}
+			}
+
+			function updateOtherCars() {
+				for (let i = 0; i < otherCars.length; i++) {
+					otherCars[i].y += ROAD_SPEED;
+				}
+
+				if (Math.random() < 0.02) {
+					const lane = Math.floor(Math.random() * 3);
+					const x =
+						(canvas.width - ROAD_WIDTH) / 2 +
+						lane * LANE_WIDTH +
+						(LANE_WIDTH - CAR_WIDTH) / 2;
+					const colors = ["red", "yellow", "green"];
+					const color =
+						colors[Math.floor(Math.random() * colors.length)];
+					otherCars.push({
+						x,
+						y: -CAR_HEIGHT,
+						width: CAR_WIDTH,
+						height: CAR_HEIGHT,
+						color,
+					});
+				}
+
+				otherCars = otherCars.filter((car) => car.y < canvas.height);
+			}
+
+			function checkCollision() {
+				otherCars.forEach((car) => {
+					if (
+						player.x < car.x + car.width &&
+						player.x + player.width > car.x &&
+						player.y < car.y + car.height &&
+						player.y + player.height > car.y
+					) {
+						gameOver = true;
+					}
+				});
+			}
+
+			function drawScore() {
+				ctx.fillStyle = "white";
+				ctx.font = "24px Arial";
+				ctx.fillText("Score: " + score, 10, 30);
+			}
+
+			function drawGameOver() {
+				ctx.fillStyle = "white";
+				ctx.font = "40px Arial";
+				ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2);
+				ctx.font = "20px Arial";
+				ctx.fillText(
+					'Press "R" to Restart',
+					canvas.width / 2,
+					canvas.height / 2 + 40
+				);
+			}
+
+			function updateGame() {
+				if (!gameOver) {
+					updatePlayer();
+					updateOtherCars();
+					checkCollision();
+					score++;
+				}
+			}
+
+			function drawGame() {
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+				ctx.fillStyle = "#444";
+				const roadLeft = (canvas.width - ROAD_WIDTH) / 2;
+				ctx.fillRect(roadLeft, 0, ROAD_WIDTH, canvas.height);
+
+				ctx.fillStyle = "white";
+				for (let i = 0; i < 6; i++) {
+					const lineY =
+						(i * 100 + ((score * 2) % 200)) % canvas.height;
+					ctx.fillRect(roadLeft + LANE_WIDTH, lineY, 5, 50);
+					ctx.fillRect(roadLeft + 2 * LANE_WIDTH, lineY, 5, 50);
+				}
+
+				drawPlayer();
+				drawOtherCars();
+				drawScore();
+
+				if (gameOver) {
+					drawGameOver();
+				}
+			}
+
+			function gameLoop() {
+				updateGame();
+				drawGame();
+				requestAnimationFrame(gameLoop);
+			}
+
+			function restartGame() {
+				player.x = canvas.width / 2 - CAR_WIDTH / 2;
+				player.speedX = 0;
+				otherCars = [];
+				score = 0;
+				gameOver = false;
+			}
+
+			gameLoop();
+		</script>
+	</body>
+</html>
