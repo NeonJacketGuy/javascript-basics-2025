@@ -36,57 +36,18 @@
 			const canvas = document.getElementById("gameCanvas");
 			const ctx = canvas.getContext("2d");
 
-			// Ball properties
-			const ballRadius = 6;
-			const initialBallSpeed = 3;
-
 			// Game variables
+			const ballRadius = 6;
+			let x = canvas.width / 2;
+			let y = canvas.height - 30;
+			let dx = 3;
+			let dy = -3;
 			const paddleHeight = 10;
 			const paddleWidth = 85;
 			let paddleX = (canvas.width - paddleWidth) / 2;
 			let score = 0;
 			let lives = 3;
 			let isPaused = false;
-			let balls = [];
-
-			// Create Ball object
-			class Ball {
-				constructor(x, y, dx, dy, isOriginal = false) {
-					this.x = x;
-					this.y = y;
-					this.dx = dx;
-					this.dy = dy;
-					this.radius = ballRadius;
-					this.isOriginal = isOriginal;
-				}
-				draw() {
-					ctx.beginPath();
-					ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-					ctx.fillStyle = this.isOriginal ? "#00ff00" : "#ff6347";
-					ctx.fill();
-					ctx.closePath();
-				}
-				move() {
-					this.x += this.dx;
-					this.y += this.dy;
-				}
-			}
-
-			function resetGame() {
-				balls = [];
-				balls.push(
-					new Ball(
-						canvas.width / 2,
-						canvas.height - 30,
-						initialBallSpeed,
-						-initialBallSpeed,
-						true
-					)
-				);
-				paddleX = (canvas.width - paddleWidth) / 2;
-			}
-
-			resetGame();
 
 			// Keyboard control variables
 			let rightPressed = false;
@@ -138,6 +99,15 @@
 				}
 			}
 
+			// Draw the ball
+			function drawBall() {
+				ctx.beginPath();
+				ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+				ctx.fillStyle = "#ff6347";
+				ctx.fill();
+				ctx.closePath();
+			}
+
 			// Draw the paddle
 			function drawPaddle() {
 				ctx.beginPath();
@@ -179,45 +149,25 @@
 
 			// Collision detection
 			function collisionDetection() {
-				for (let i = 0; i < balls.length; i++) {
-					const ball = balls[i];
-					for (let c = 0; c < brickColumnCount; c++) {
-						for (let r = 0; r < brickRowCount; r++) {
-							const b = bricks[c][r];
-							if (b.status === 1) {
+				for (let c = 0; c < brickColumnCount; c++) {
+					for (let r = 0; r < brickRowCount; r++) {
+						const b = bricks[c][r];
+						if (b.status === 1) {
+							if (
+								x > b.x &&
+								x < b.x + brickWidth &&
+								y > b.y &&
+								y < b.y + brickHeight
+							) {
+								dy = -dy;
+								b.status = 0;
+								score++;
 								if (
-									ball.x > b.x &&
-									ball.x < b.x + brickWidth &&
-									ball.y > b.y &&
-									ball.y < b.y + brickHeight
+									score ===
+									brickRowCount * brickColumnCount
 								) {
-									ball.dy = -ball.dy;
-									b.status = 0;
-									score++;
-
-									// 1 in 4 chance to spawn a new ball if the ORIGINAL ball hits a block
-									if (
-										ball.isOriginal &&
-										Math.random() < 0.25
-									) {
-										const newBall = new Ball(
-											ball.x,
-											ball.y,
-											Math.random() * 6 - 3,
-											Math.random() * 6 - 3
-										);
-										balls.push(newBall);
-									}
-
-									if (
-										score ===
-										brickRowCount * brickColumnCount
-									) {
-										alert(
-											"Victory Royal! Congratulations!"
-										);
-										document.location.reload();
-									}
+									alert("Victory Royal! Congratulations!");
+									document.location.reload();
 								}
 							}
 						}
@@ -244,49 +194,35 @@
 				if (!isPaused) {
 					ctx.clearRect(0, 0, canvas.width, canvas.height);
 					drawBricks();
+					drawBall();
 					drawPaddle();
 					drawScore();
 					drawLives();
 					collisionDetection();
 
-					for (let i = 0; i < balls.length; i++) {
-						const ball = balls[i];
-						ball.draw();
-						ball.move();
-
-						// Wall collision logic
-						if (
-							ball.x + ball.dx > canvas.width - ball.radius ||
-							ball.x + ball.dx < ball.radius
-						) {
-							ball.dx = -ball.dx;
-						}
-						if (ball.y + ball.dy < ball.radius) {
-							ball.dy = -ball.dy;
-						} else if (
-							ball.y + ball.dy >
-							canvas.height - ball.radius
-						) {
-							if (
-								ball.x > paddleX &&
-								ball.x < paddleX + paddleWidth
-							) {
-								ball.dy = -ball.dy;
+					// Wall collision logic
+					if (
+						x + dx > canvas.width - ballRadius ||
+						x + dx < ballRadius
+					) {
+						dx = -dx;
+					}
+					if (y + dy < ballRadius) {
+						dy = -dy;
+					} else if (y + dy > canvas.height - ballRadius) {
+						if (x > paddleX && x < paddleX + paddleWidth) {
+							dy = -dy;
+						} else {
+							lives--;
+							if (!lives) {
+								alert("Game Over! Try again!");
+								document.location.reload();
 							} else {
-								balls.splice(i, 1); // Remove ball from the array
-								i--; // Decrement the counter to account for the removed ball
-
-								// Check if any balls are left. If not, lose a life and reset.
-								if (balls.length === 0) {
-									lives--;
-									if (!lives) {
-										alert("Game Over! Try again!");
-										document.location.reload();
-									} else {
-										// Respawn a new original ball
-										resetGame();
-									}
-								}
+								x = canvas.width / 2;
+								y = canvas.height - 30;
+								dx = 3;
+								dy = -3;
+								paddleX = (canvas.width - paddleWidth) / 2;
 							}
 						}
 					}
@@ -297,6 +233,10 @@
 					} else if (leftPressed && paddleX > 0) {
 						paddleX -= 7;
 					}
+
+					// Move ball
+					x += dx;
+					y += dy;
 				}
 
 				requestAnimationFrame(draw);
