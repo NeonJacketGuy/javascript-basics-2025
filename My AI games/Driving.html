@@ -37,6 +37,7 @@
 			const BOOST_ROAD_SPEED = 50;
 			const SLOW_ROAD_SPEED = 4;
 			const PLAYER_SPEED = 5;
+			const SPACEBAR_BOOST_SPEED = 25;
 
 			let ROAD_SPEED = NORMAL_ROAD_SPEED;
 			let isInvincible = false;
@@ -72,6 +73,10 @@
 						ROAD_SPEED = BOOST_ROAD_SPEED;
 					} else if (e.key.toLowerCase() === "s") {
 						ROAD_SPEED = SLOW_ROAD_SPEED;
+					} else if (e.key === " ") {
+						e.preventDefault();
+						ROAD_SPEED = SPACEBAR_BOOST_SPEED;
+						activateInvincibility();
 					}
 				}
 				if (e.key.toLowerCase() === "r" && gameOver) {
@@ -90,6 +95,8 @@
 						e.key.toLowerCase() === "w" ||
 						e.key.toLowerCase() === "s"
 					) {
+						ROAD_SPEED = NORMAL_ROAD_SPEED;
+					} else if (e.key === " ") {
 						ROAD_SPEED = NORMAL_ROAD_SPEED;
 					}
 				}
@@ -336,25 +343,20 @@
 
 			function togglePause() {
 				isPaused = !isPaused;
+				if (!isPaused) {
+					gameLoop();
+				}
 			}
 
 			function restartGame() {
-				player.x = canvas.width / 2 - CAR_WIDTH / 2;
-				player.speedX = 0;
-				otherCars = [];
-				powerUps = [];
-				score = 0;
 				gameOver = false;
 				isPaused = false;
+				score = 0;
+				otherCars = [];
+				powerUps = [];
 				ROAD_SPEED = NORMAL_ROAD_SPEED;
 				isInvincible = false;
-				if (invincibilityTimerId) {
-					clearTimeout(invincibilityTimerId);
-					invincibilityTimerId = null;
-				}
-				if (animationFrameId) {
-					cancelAnimationFrame(animationFrameId);
-				}
+				player.x = canvas.width / 2 - CAR_WIDTH / 2;
 				gameLoop();
 			}
 
