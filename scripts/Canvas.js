@@ -1,58 +1,66 @@
 //@ts-check
 
 /** @type { HTMLCanvasElement } */
-//@ts-ignore
-const canvas = document.getElementById("game-canvas");
+//@ts-ignore This is an HTML Canvas
+const CANVAS = document.getElementById("game-canvas");
 
 /** @type { CanvasRenderingContext2D } */
-//@ts-ignore 
-const CTX = canvas.getContext("2d");
+//@ts-ignore is not null
+const CTX = CANVAS.getContext("2d");
 
 const HEIGHT = 600;
 const WIDTH = 800;
 
-canvas.height = HEIGHT;
-canvas.width = WIDTH
-
-
-CTX.fillStyle = "black";
-CTX.fillRect(0, 0, WIDTH, HEIGHT);
-
-CTX.fillStyle = "blue";
-CTX.fillRect(0, 0, 200, 600);
-
-CTX.fillStyle = "blue";
-CTX.fillRect(600, 0, 200, 600);
-
-CTX.fillStyle = "red";
-CTX.arc(WIDTH / 2, HEIGHT / 2, 100, 0, 2 * Math.PI,);
-CTX.fill();
+CANVAS.height = HEIGHT;
+CANVAS.width = WIDTH;
 
 let currentTimestamp = 0;
-let x = 0;
-let y = 0;
 
 let box = {
-    x: 0,
-    y: 0,
-    width: 10,
-    draw: function() {
-        CTX.fillStyle = "green";
-        CTX.fillRect(this.x, this.y, this.width, this.width);
-    }
+	x: 0,
+	y: 0,
+	xDirection: 1,
+	yDirection: 1,
+	width: 10,
+	draw: function () {
+		CTX.fillStyle = "blue";
+		CTX.fillRect(this.x, this.y, this.width, this.width);
+	},
+	update: function () {
+		let top = this.y;
+		let bottom = this.y + this.width;
+		let left = this.x;
+		let right = this.x + this.width;
+
+		if (top < 0) {
+			this.yDirection = 5;
+		} else if (bottom > HEIGHT) {
+			this.yDirection = -1;
+		}
+
+		if (left < 0) {
+			this.xDirection = 5;
+		} else if (right > WIDTH) {
+			this.xDirection = -1;
+		}
+
+
+		this.x += this.xDirection;
+		this.y += this.yDirection;
+	},
 };
 
 function drawLoop(timestamp) {
-    //CTX.clearRect(0, 0, WIDTH, HEIGHT)
-    let elapsedTime = timestamp - currentTimestamp;
-    currentTimestamp = timestamp;
+	CTX.clearRect(0, 0, WIDTH, HEIGHT);
 
-    box.draw();
-    box.x++;
-    box.y++;
-    
-    requestAnimationFrame(drawLoop);
+	let elapsedTime = timestamp - currentTimestamp;
+	currentTimestamp = timestamp;
+
+	box.draw();
+	box.update();
+
+	// console.log(elapsedTime);
+	requestAnimationFrame(drawLoop);
 }
 
 requestAnimationFrame(drawLoop);
-
