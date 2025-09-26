@@ -38,16 +38,12 @@
 			let enemies = [];
 			let projectiles = [];
 			let score = 0;
+			let level = 1;
 			let isGameOver = false;
 			let enemySpawnTimer = 0;
-			let enemySpawnInterval = 120; // in frames
 
-			const playerSpeed = 5;
 			const projectileSpeed = 7;
-			const enemySpeed = 1;
-			const enemyRows = 4;
-			const enemyCols = 8;
-			const enemyPadding = 50;
+			let enemySpeed = 1;
 
 			// Autoclicker variables
 			let autoclickerEnabled = false;
@@ -61,6 +57,8 @@
 					this.x = canvas.width / 2 - this.width / 2;
 					this.y = canvas.height - this.height - 20;
 					this.speedX = 0;
+					this.speedY = 0;
+					this.playerSpeed = 5;
 				}
 
 				draw() {
@@ -85,17 +83,37 @@
 						new Projectile(
 							this.x + this.width / 2,
 							this.y,
-							-projectileSpeed
+							0, // speedX
+							-projectileSpeed // speedY
 						)
 					);
+				}
+
+				shoot360() {
+					const numBullets = 20; // Number of bullets to fire in a circle
+					const angleStep = (Math.PI * 2) / numBullets;
+					for (let i = 0; i < numBullets; i++) {
+						const angle = i * angleStep;
+						const speedX = Math.cos(angle) * projectileSpeed;
+						const speedY = Math.sin(angle) * projectileSpeed;
+						projectiles.push(
+							new Projectile(
+								this.x + this.width / 2,
+								this.y + this.height / 2,
+								speedX,
+								speedY
+							)
+						);
+					}
 				}
 			}
 
 			class Projectile {
-				constructor(x, y, speedY) {
+				constructor(x, y, speedX, speedY) {
 					this.x = x;
 					this.y = y;
 					this.radius = 3;
+					this.speedX = speedX;
 					this.speedY = speedY;
 				}
 
@@ -107,6 +125,7 @@
 				}
 
 				update() {
+					this.x += this.speedX;
 					this.y += this.speedY;
 				}
 			}
@@ -130,7 +149,11 @@
 			}
 
 			function createEnemies() {
+				const enemyCols = 8 + Math.min(level - 1, 4); // Up to 12 columns
+				const enemyRows = 4 + Math.min(level - 1, 3); // Up to 7 rows
+				const enemyPadding = 50 - Math.min(level - 1, 2) * 5; // Reduced spacing
 				const startX = (canvas.width - enemyCols * enemyPadding) / 2;
+
 				for (let row = 0; row < enemyRows; row++) {
 					for (let col = 0; col < enemyCols; col++) {
 						enemies.push(
@@ -147,10 +170,22 @@
 				player = new Player();
 				enemies = [];
 				projectiles = [];
+				level = 1;
+				score = 0;
+				enemySpeed = 1;
 				createEnemies();
 				isGameOver = false;
-				score = 0;
-				// Ensure autoclicker is off on init
+				stopAutoclicker();
+			}
+
+			function nextLevel() {
+				level++;
+				// Increase enemy speed for the next level, maxing out at a certain value
+				enemySpeed = 1 + Math.min(level - 1, 5) * 0.5;
+				enemies = [];
+				projectiles = [];
+				createEnemies();
+				isGameOver = false; // Reset to continue the game
 				stopAutoclicker();
 			}
 
@@ -162,18 +197,20 @@
 					}
 					return;
 				}
-				if (e.key === "ArrowLeft") player.speedX = -playerSpeed;
-				if (e.key === "ArrowRight") player.speedX = playerSpeed;
+				if (e.key === "ArrowLeft") player.speedX = -player.playerSpeed;
+				if (e.key === "ArrowRight") player.speedX = player.playerSpeed;
 				if (e.key === " ") {
 					e.preventDefault();
 					if (!autoclickerEnabled) {
-						// Only shoot if autoclicker isn't active
 						player.shoot();
 					}
 				}
 				if (e.key === "Control") {
 					e.preventDefault();
 					toggleAutoclicker();
+				}
+				if (e.key === "m" || e.key === "M") {
+					player.shoot360();
 				}
 			});
 
@@ -195,7 +232,7 @@
 				autoclickerEnabled = true;
 				autoclickerInterval = setInterval(() => {
 					player.shoot();
-				}, 100); // 100 milliseconds is a good speed
+				}, 100);
 				console.log("Autoclicker enabled. Press Ctrl to disable.");
 			}
 
@@ -206,7 +243,6 @@
 			}
 
 			function checkCollisions() {
-				// Projectile vs Enemy
 				projectiles.forEach((proj, projIndex) => {
 					enemies.forEach((enemy, enemyIndex) => {
 						if (
@@ -222,7 +258,6 @@
 					});
 				});
 
-				// Player vs Enemy
 				enemies.forEach((enemy) => {
 					if (
 						player.x < enemy.x + enemy.width &&
@@ -237,17 +272,22 @@
 
 			function checkGameStatus() {
 				if (enemies.length === 0) {
-					isGameOver = true;
-					// Add a "You win!" state
-					ctx.fillStyle = "lime";
-					ctx.font = "48px monospace";
-					ctx.textAlign = "center";
-					ctx.fillText(
-						"You Win!",
-						canvas.width / 2,
-						canvas.height / 2
-					);
-					stopAutoclicker();
+					if (level >= 10) {
+						// Win after completing 10 levels
+						isGameOver = true;
+						ctx.fillStyle = "lime";
+						ctx.font = "48px monospace";
+						ctx.textAlign = "center";
+						ctx.fillText(
+							"You Win!",
+							canvas.width / 2,
+							canvas.height / 2
+						);
+						stopAutoclicker();
+					} else {
+						// Advance to next level
+						nextLevel();
+					}
 				}
 				enemies.forEach((enemy) => {
 					if (enemy.y + enemy.height >= canvas.height) {
@@ -259,12 +299,16 @@
 			function drawScore() {
 				ctx.fillStyle = "white";
 				ctx.font = "24px monospace";
+				ctx.textAlign = "left";
 				ctx.fillText(`Score: ${score}`, 10, 30);
+				ctx.fillText(`Level: ${level}`, 10, 60);
+
 				// Draw autoclicker status
 				const status = autoclickerEnabled
 					? "Autoclicker: ON"
 					: "Autoclicker: OFF";
-				ctx.fillText(status, canvas.width - 250, 30);
+				ctx.textAlign = "right";
+				ctx.fillText(status, canvas.width - 10, 30);
 			}
 
 			function drawGameOver() {
@@ -302,9 +346,7 @@
 				if (isGameOver) {
 					checkGameStatus();
 					if (isGameOver) {
-						if (enemies.length > 0) {
-							drawGameOver();
-						}
+						drawGameOver();
 						return;
 					}
 				}
@@ -327,8 +369,11 @@
 				checkGameStatus();
 				drawScore();
 
-				// Filter out old projectiles
-				projectiles = projectiles.filter((proj) => proj.y > 0);
+				// Filter out projectiles that have left the screen
+				projectiles = projectiles.filter((proj) => 
+					proj.x > -proj.radius && proj.x < canvas.width + proj.radius && 
+					proj.y > -proj.radius && proj.y < canvas.height + proj.radius
+				);
 
 				requestAnimationFrame(animate);
 			}
@@ -339,3 +384,4 @@
 		</script>
 	</body>
 </html>
+
