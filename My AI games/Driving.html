@@ -29,9 +29,10 @@
 			const canvas = document.getElementById("gameCanvas");
 			const ctx = canvas.getContext("2d");
 
-			const ROAD_WIDTH = 300;
-			const LANE_WIDTH = ROAD_WIDTH / 3;
-			const CAR_WIDTH = 40;
+			const NUM_LANES = 5;
+			let ROAD_WIDTH = canvas.width;
+			let LANE_WIDTH = ROAD_WIDTH / NUM_LANES;
+			let CAR_WIDTH = LANE_WIDTH * 0.8;
 			const CAR_HEIGHT = 60;
 			const NORMAL_ROAD_SPEED = 10;
 			const BOOST_ROAD_SPEED = 50;
@@ -49,6 +50,7 @@
 				height: CAR_HEIGHT,
 				speedX: 0,
 				color: "blue",
+				rotation: 0, // Player faces up (0 degrees)
 			};
 
 			let otherCars = [];
@@ -57,6 +59,19 @@
 			let gameOver = false;
 			let isPaused = false;
 			let animationFrameId;
+
+			function resizeCanvas() {
+				canvas.width = window.innerWidth * 0.9;
+				canvas.height = window.innerHeight * 0.9;
+				ROAD_WIDTH = canvas.width;
+				LANE_WIDTH = ROAD_WIDTH / NUM_LANES;
+				CAR_WIDTH = LANE_WIDTH * 0.8;
+				player.x = canvas.width / 2 - CAR_WIDTH / 2;
+				player.width = CAR_WIDTH;
+			}
+
+			window.addEventListener("resize", resizeCanvas);
+			resizeCanvas();
 
 			document.addEventListener("keydown", (e) => {
 				if (e.key === "Escape") {
@@ -95,23 +110,114 @@
 				}
 			});
 
+			// Function to draw a car with more detail and rotation
+			function drawCar(car, isPlayer) {
+				const carColor = car.color;
+				const wheelColor = "#111";
+				const wheelRadius = car.width / 6;
+
+				ctx.save();
+				ctx.translate(car.x + car.width / 2, car.y + car.height / 2);
+				ctx.rotate(car.rotation);
+
+				// Draw wheels first (relative to the new origin)
+				ctx.fillStyle = wheelColor;
+				ctx.beginPath();
+				// Back-left wheel
+				ctx.arc(
+					-(car.width / 2) + wheelRadius * 1.5,
+					-(car.height / 2) + wheelRadius,
+					wheelRadius,
+					0,
+					2 * Math.PI
+				);
+				// Back-right wheel
+				ctx.arc(
+					car.width / 2 - wheelRadius * 1.5,
+					-(car.height / 2) + wheelRadius,
+					wheelRadius,
+					0,
+					2 * Math.PI
+				);
+				// Front-left wheel
+				ctx.arc(
+					-(car.width / 2) + wheelRadius * 1.5,
+					car.height / 2 - wheelRadius,
+					wheelRadius,
+					0,
+					2 * Math.PI
+				);
+				// Front-right wheel
+				ctx.arc(
+					car.width / 2 - wheelRadius * 1.5,
+					car.height / 2 - wheelRadius,
+					wheelRadius,
+					0,
+					2 * Math.PI
+				);
+				ctx.fill();
+				ctx.closePath();
+
+				// Draw car body on top of the wheels
+				ctx.fillStyle = carColor;
+				const borderRadius = 5;
+				ctx.beginPath();
+				ctx.roundRect(
+					-car.width / 2,
+					-car.height / 2,
+					car.width,
+					car.height,
+					borderRadius
+				);
+				ctx.fill();
+				ctx.closePath();
+
+				// Draw car roof/windows
+				ctx.fillStyle = "#888";
+				ctx.beginPath();
+				const roofHeight = car.height * 0.4;
+				const roofWidth = car.width * 0.7;
+				const roofX = -(roofWidth / 2);
+				const roofY = -(car.height / 2) + car.height * 0.15;
+				ctx.roundRect(
+					roofX,
+					roofY,
+					roofWidth,
+					roofHeight,
+					borderRadius
+				);
+				ctx.fill();
+				ctx.closePath();
+
+				// Add "Caution Student Driver" text to other cars
+				if (!isPlayer) {
+					ctx.fillStyle = "black";
+					ctx.font = "bold 10px Arial";
+					ctx.textAlign = "center";
+					ctx.fillText("Caution", 0, 0 - 5);
+					ctx.fillText("Student Driver", 0, 0 + 5);
+					ctx.textAlign = "left";
+				}
+
+				ctx.restore();
+			}
+
 			function drawPlayer() {
 				if (isInvincible) {
 					if (Math.floor(Date.now() / 100) % 2 === 0) {
-						ctx.fillStyle = player.color;
+						player.color = "blue";
 					} else {
-						ctx.fillStyle = "white";
+						player.color = "white";
 					}
 				} else {
-					ctx.fillStyle = player.color;
+					player.color = "blue";
 				}
-				ctx.fillRect(player.x, player.y, player.width, player.height);
+				drawCar(player, true);
 			}
 
 			function drawOtherCars() {
 				otherCars.forEach((car) => {
-					ctx.fillStyle = car.color;
-					ctx.fillRect(car.x, car.y, car.width, car.height);
+					drawCar(car, false);
 				});
 			}
 
@@ -132,11 +238,11 @@
 
 			function updatePlayer() {
 				player.x += player.speedX;
-				if (player.x < (canvas.width - ROAD_WIDTH) / 2) {
-					player.x = (canvas.width - ROAD_WIDTH) / 2;
+				if (player.x < 0) {
+					player.x = 0;
 				}
-				if (player.x + player.width > (canvas.width + ROAD_WIDTH) / 2) {
-					player.x = (canvas.width + ROAD_WIDTH) / 2 - player.width;
+				if (player.x + player.width > canvas.width) {
+					player.x = canvas.width - player.width;
 				}
 			}
 
@@ -146,18 +252,15 @@
 					car.y += ROAD_SPEED;
 
 					if (car.isSwerving) {
-						const swerveSpeed = 0.5;
+						const swerveSpeed = 5;
 						car.x += swerveSpeed * Math.sin(car.swerveTime);
-						car.swerveTime += 0.05;
+						car.swerveTime += 50;
 					}
 				}
 
 				if (Math.random() < 0.02 * (ROAD_SPEED / NORMAL_ROAD_SPEED)) {
-					const lane = Math.floor(Math.random() * 3);
-					const x =
-						(canvas.width - ROAD_WIDTH) / 2 +
-						lane * LANE_WIDTH +
-						(LANE_WIDTH - CAR_WIDTH) / 2;
+					const lane = Math.floor(Math.random() * NUM_LANES);
+					const x = lane * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) / 2;
 					const colors = ["red", "yellow", "green"];
 					const color =
 						colors[Math.floor(Math.random() * colors.length)];
@@ -172,6 +275,7 @@
 						swerveTime: isSwerving
 							? Math.random() * 2 * Math.PI
 							: 0,
+						rotation: Math.PI, // Opponent cars face down (180 degrees)
 					});
 				}
 
@@ -184,11 +288,8 @@
 				}
 
 				if (Math.random() < 0.005) {
-					const lane = Math.floor(Math.random() * 3);
-					const x =
-						(canvas.width - ROAD_WIDTH) / 2 +
-						lane * LANE_WIDTH +
-						(LANE_WIDTH - CAR_WIDTH) / 2;
+					const lane = Math.floor(Math.random() * NUM_LANES);
+					const x = lane * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) / 2;
 					powerUps.push({
 						x,
 						y: -CAR_HEIGHT,
@@ -301,16 +402,16 @@
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 
 				ctx.fillStyle = "#444";
-				const roadLeft = (canvas.width - ROAD_WIDTH) / 2;
-				ctx.fillRect(roadLeft, 0, ROAD_WIDTH, canvas.height);
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 				ctx.fillStyle = "white";
-				for (let i = 0; i < 6; i++) {
-					const lineY =
-						(i * 100 + ((score * (ROAD_SPEED * 0.2)) % 200)) %
-						canvas.height;
-					ctx.fillRect(roadLeft + LANE_WIDTH, lineY, 5, 50);
-					ctx.fillRect(roadLeft + 2 * LANE_WIDTH, lineY, 5, 50);
+				for (let lane = 1; lane < NUM_LANES; lane++) {
+					for (let i = 0; i < 6; i++) {
+						const lineY =
+							(i * 100 + ((score * (ROAD_SPEED * 0.2)) % 200)) %
+							canvas.height;
+						ctx.fillRect(lane * LANE_WIDTH - 2.5, lineY, 5, 50);
+					}
 				}
 
 				drawPlayer();
@@ -339,23 +440,18 @@
 			}
 
 			function restartGame() {
-				player.x = canvas.width / 2 - CAR_WIDTH / 2;
-				player.speedX = 0;
+				gameOver = false;
+				score = 0;
 				otherCars = [];
 				powerUps = [];
-				score = 0;
-				gameOver = false;
-				isPaused = false;
+				player.x = canvas.width / 2 - CAR_WIDTH / 2;
+				player.speedX = 0;
 				ROAD_SPEED = NORMAL_ROAD_SPEED;
 				isInvincible = false;
 				if (invincibilityTimerId) {
 					clearTimeout(invincibilityTimerId);
 					invincibilityTimerId = null;
 				}
-				if (animationFrameId) {
-					cancelAnimationFrame(animationFrameId);
-				}
-				gameLoop();
 			}
 
 			gameLoop();
