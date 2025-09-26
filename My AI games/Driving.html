@@ -146,9 +146,9 @@
 					car.y += ROAD_SPEED;
 
 					if (car.isSwerving) {
-						const swerveSpeed = 0.5;
+						const swerveSpeed = 10;
 						car.x += swerveSpeed * Math.sin(car.swerveTime);
-						car.swerveTime += 0.05;
+						car.swerveTime += 25;
 					}
 				}
 
@@ -228,7 +228,7 @@
 				invincibilityTimerId = setTimeout(() => {
 					isInvincible = false;
 					invincibilityTimerId = null;
-				}, 15000);
+				}, 4000);
 			}
 
 			function checkCollision() {
