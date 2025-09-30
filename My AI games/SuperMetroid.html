@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>3D Metroid-style Platformer</title>
+		<title>3D Metroid-style Platformer (Cooler)</title>
 		<style>
 			body {
 				margin: 0;
@@ -13,24 +13,44 @@
 			canvas {
 				display: block;
 			}
-			#info {
+			#info,
+			#health-bar {
 				position: absolute;
 				top: 10px;
-				left: 10px;
-				color: white;
 				font-family: Arial, sans-serif;
 				font-size: 1.2em;
 				text-shadow: 1px 1px 2px black;
+				color: white;
 				background-color: rgba(0, 0, 0, 0.5);
 				padding: 10px;
 				border-radius: 5px;
+			}
+			#info {
+				left: 10px;
+			}
+			#health-bar {
+				right: 10px;
+			}
+			#game-over {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				font-size: 3em;
+				color: red;
+				text-shadow: 2px 2px 5px black;
+				display: none;
+				z-index: 100;
 			}
 		</style>
 	</head>
 	<body>
 		<div id="info">
-			Use A/D to move, Space to jump, and mouse-click to shoot.
+			Use A/D to move, Space to jump, mouse-look, and mouse-click to
+			shoot.
 		</div>
+		<div id="health-bar">Health: <span id="health-value">100</span></div>
+		<div id="game-over">GAME OVER</div>
 
 		<!-- Three.js Library included directly -->
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -52,10 +72,13 @@
 			const ambientLight = new THREE.AmbientLight(0x404040, 2);
 			scene.add(ambientLight);
 			const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-			directionalLight.position.set(0, 5, 10);
+			directionalLight.position.set(0, 10, 10);
 			scene.add(directionalLight);
 
 			// --- GAME OBJECTS ---
+			let health = 100;
+			let isGameOver = false;
+
 			// Player
 			const playerGeometry = new THREE.BoxGeometry(1, 1.5, 1);
 			const playerMaterial = new THREE.MeshLambertMaterial({
@@ -69,25 +92,46 @@
 			};
 			scene.add(player);
 
-			// Enemy (simple box)
+			// Enemies
+			const enemies = [];
 			const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
 			const enemyMaterial = new THREE.MeshLambertMaterial({
 				color: 0xff0000,
 			});
-			const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-			enemy.position.set(10, 0.5, 5);
-			enemy.userData = { direction: 1, health: 1 };
-			scene.add(enemy);
+
+			function createEnemy(x, y, z) {
+				const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+				enemy.position.set(x, y, z);
+				enemy.userData = { direction: 1, health: 1 };
+				scene.add(enemy);
+				enemies.push(enemy);
+				return enemy;
+			}
+
+			createEnemy(10, 0.5, 5);
+			createEnemy(25, 0.5, 5);
 
 			// Level (platforms)
-			const floorGeometry = new THREE.PlaneGeometry(30, 10);
-			const floorMaterial = new THREE.MeshLambertMaterial({
-				color: 0x666666,
-			});
-			const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-			floor.rotation.x = -Math.PI / 2;
-			floor.position.set(15, 0, 5);
-			scene.add(floor);
+			const platforms = [];
+			function createPlatform(x, y, z, width, height, depth) {
+				const platformGeometry = new THREE.PlaneGeometry(width, depth);
+				const platformMaterial = new THREE.MeshLambertMaterial({
+					color: 0x666666,
+				});
+				const platform = new THREE.Mesh(
+					platformGeometry,
+					platformMaterial
+				);
+				platform.rotation.x = -Math.PI / 2;
+				platform.position.set(x, y, z);
+				platforms.push(platform);
+				scene.add(platform);
+				return platform;
+			}
+
+			createPlatform(15, 0, 5, 30, 10); // Main floor
+			createPlatform(5, 3, 5, 5, 5); // Raised platform 1
+			createPlatform(25, 3, 5, 5, 5); // Raised platform 2
 
 			// --- GAME LOGIC ---
 			const gravity = -0.05;
@@ -95,8 +139,11 @@
 			const playerSpeed = 0.1;
 			const bulletSpeed = 0.5;
 			const bullets = [];
+			const particles = [];
+			const healthBarElement = document.getElementById("health-value");
+			const gameOverElement = document.getElementById("game-over");
 
-			// Camera follow
+			// Camera follow & look
 			camera.position.set(
 				player.position.x,
 				player.position.y + 5,
@@ -113,10 +160,34 @@
 				keys[e.key] = false;
 			});
 			window.addEventListener("mousedown", (e) => {
-				if (e.button === 0) {
-					// Left-click
+				if (e.button === 0 && !isGameOver) {
 					shoot();
 				}
+			});
+
+			let isMouseDown = false;
+			let lastMouseX = 0;
+			let lastMouseY = 0;
+			window.addEventListener("mousedown", (e) => {
+				isMouseDown = true;
+			});
+			window.addEventListener("mouseup", () => {
+				isMouseDown = false;
+			});
+			window.addEventListener("mousemove", (e) => {
+				if (isMouseDown) {
+					const sensitivity = 0.002;
+					const deltaX = e.clientX - lastMouseX;
+					const deltaY = e.clientY - lastMouseY;
+					camera.rotation.y -= deltaX * sensitivity;
+					camera.rotation.x -= deltaY * sensitivity;
+					camera.rotation.x = Math.max(
+						-Math.PI / 2,
+						Math.min(Math.PI / 2, camera.rotation.x)
+					);
+				}
+				lastMouseX = e.clientX;
+				lastMouseY = e.clientY;
 			});
 
 			function shoot() {
@@ -126,18 +197,59 @@
 				});
 				const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
 				bullet.position.copy(player.position);
+				const direction = new THREE.Vector3();
+				camera.getWorldDirection(direction);
 				bullet.userData = {
-					velocity: new THREE.Vector3(1, 0, 0)
-						.applyQuaternion(camera.quaternion)
-						.multiplyScalar(bulletSpeed),
+					velocity: direction.multiplyScalar(bulletSpeed),
 				};
 				scene.add(bullet);
 				bullets.push(bullet);
 			}
 
+			function createParticles(position, color) {
+				const particleCount = 20;
+				const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+				const particleMaterial = new THREE.MeshBasicMaterial({
+					color: color,
+				});
+
+				for (let i = 0; i < particleCount; i++) {
+					const particle = new THREE.Mesh(
+						particleGeometry,
+						particleMaterial
+					);
+					particle.position.copy(position);
+					const velocity = new THREE.Vector3(
+						(Math.random() - 0.5) * 0.2,
+						Math.random() * 0.2,
+						(Math.random() - 0.5) * 0.2
+					);
+					particle.userData = { velocity: velocity, life: 60 };
+					scene.add(particle);
+					particles.push(particle);
+				}
+			}
+
+			function checkCollision(obj1, obj2) {
+				const box1 = new THREE.Box3().setFromObject(obj1);
+				const box2 = new THREE.Box3().setFromObject(obj2);
+				return box1.intersectsBox(box2);
+			}
+
+			function takeDamage() {
+				if (isGameOver) return;
+				health -= 10;
+				healthBarElement.textContent = health;
+				if (health <= 0) {
+					isGameOver = true;
+					gameOverElement.style.display = "block";
+				}
+			}
+
 			// --- ANIMATION LOOP ---
 			const animate = () => {
 				requestAnimationFrame(animate);
+				if (isGameOver) return;
 
 				// Player movement
 				if (keys["a"]) player.userData.velocity.x = -playerSpeed;
@@ -156,40 +268,82 @@
 				player.position.add(player.userData.velocity);
 
 				// Ground collision
-				if (player.position.y <= 0.75) {
-					player.position.y = 0.75;
-					player.userData.velocity.y = 0;
-					player.userData.isGrounded = true;
-				}
+				player.userData.isGrounded = false;
+				platforms.forEach((platform) => {
+					if (
+						player.position.y <= platform.position.y + 0.75 &&
+						Math.abs(player.position.x - platform.position.x) <
+							platform.geometry.parameters.width / 2 &&
+						Math.abs(player.position.z - platform.position.z) <
+							platform.geometry.parameters.depth / 2
+					) {
+						player.position.y = platform.position.y + 0.75;
+						player.userData.velocity.y = 0;
+						player.userData.isGrounded = true;
+					}
+				});
 
 				// Enemy behavior
-				if (enemy && enemy.userData.health > 0) {
-					if (enemy.position.x > 15) enemy.userData.direction = -1;
-					if (enemy.position.x < 5) enemy.userData.direction = 1;
-					enemy.position.x += 0.05 * enemy.userData.direction;
-				}
+				enemies.forEach((enemy) => {
+					if (enemy.userData.health > 0) {
+						if (enemy.position.x > enemy.parent.position.x + 5)
+							enemy.userData.direction = -1;
+						if (enemy.position.x < enemy.parent.position.x - 5)
+							enemy.userData.direction = 1;
+						enemy.position.x += 0.05 * enemy.userData.direction;
+
+						if (checkCollision(player, enemy)) {
+							takeDamage();
+						}
+					}
+				});
 
 				// Bullet logic
 				bullets.forEach((bullet, index) => {
 					bullet.position.add(bullet.userData.velocity);
 
-					// Bullet-enemy collision
-					if (enemy && enemy.userData.health > 0) {
-						const distance = bullet.position.distanceTo(
-							enemy.position
-						);
-						if (distance < 1) {
-							// Simple collision check
+					enemies.forEach((enemy) => {
+						if (
+							enemy.userData.health > 0 &&
+							checkCollision(bullet, enemy)
+						) {
 							enemy.userData.health = 0;
+							createParticles(enemy.position, 0xff0000);
 							scene.remove(enemy);
 							scene.remove(bullet);
 							bullets.splice(index, 1);
 						}
+					});
+
+					if (bullet.position.y < -5) {
+						scene.remove(bullet);
+						bullets.splice(index, 1);
 					}
 				});
 
+				// Particle logic
+				particles.forEach((particle, index) => {
+					particle.position.add(particle.userData.velocity);
+					particle.userData.velocity.y += gravity;
+					particle.userData.life--;
+					if (particle.userData.life <= 0) {
+						scene.remove(particle);
+						particles.splice(index, 1);
+					}
+				});
+
+				// Enemy respawn
+				if (enemies.filter((e) => e.userData.health > 0).length === 0) {
+					// Respawn enemies at their initial positions
+					enemies.forEach((e) => scene.remove(e));
+					enemies.length = 0;
+					createEnemy(10, 0.5, 5);
+					createEnemy(25, 0.5, 5);
+				}
+
 				// Camera update
 				camera.position.x = player.position.x;
+				camera.position.z = player.position.z + 5;
 				camera.lookAt(player.position);
 
 				renderer.render(scene, camera);
