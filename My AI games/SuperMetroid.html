@@ -85,7 +85,8 @@
 				color: 0x87ceeb,
 			});
 			const player = new THREE.Mesh(playerGeometry, playerMaterial);
-			player.position.set(0, 0.75, 5);
+			// Set the player's initial position on the first platform
+			player.position.set(-10, 0.75, 5);
 			player.userData = {
 				velocity: new THREE.Vector3(0, 0, 0),
 				isGrounded: false,
@@ -143,7 +144,7 @@
 			const healthBarElement = document.getElementById("health-value");
 			const gameOverElement = document.getElementById("game-over");
 
-			// Camera follow & look
+			// Camera follow & look - Initial setup
 			camera.position.set(
 				player.position.x,
 				player.position.y + 5,
@@ -334,7 +335,6 @@
 
 				// Enemy respawn
 				if (enemies.filter((e) => e.userData.health > 0).length === 0) {
-					// Respawn enemies at their initial positions
 					enemies.forEach((e) => scene.remove(e));
 					enemies.length = 0;
 					createEnemy(10, 0.5, 5);
