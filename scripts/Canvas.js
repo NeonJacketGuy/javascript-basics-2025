@@ -14,6 +14,8 @@ const WIDTH = 800;
 CANVAS.height = HEIGHT;
 CANVAS.width = WIDTH;
 
+
+
 class Box {
 	constructor(x, y, color) {
 		this.x = x;
