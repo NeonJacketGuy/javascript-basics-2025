@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Simple HTML Farm Game</title>
+		<style>
+			body {
+				font-family: Arial, sans-serif;
+				background-color: #f0f8e9;
+				color: #333;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				min-height: 100vh;
+				margin: 0;
+				text-align: center;
+			}
+			.container {
+				background-color: #fff;
+				padding: 20px;
+				border-radius: 10px;
+				box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+			}
+			h1 {
+				color: #4c8a29;
+				margin-bottom: 10px;
+			}
+			#message {
+				font-size: 1.1em;
+				height: 1.5em;
+				margin-bottom: 15px;
+			}
+			#stats {
+				font-size: 1.2em;
+				margin-bottom: 20px;
+			}
+			#farm-grid {
+				display: grid;
+				grid-template-columns: repeat(5, 50px);
+				grid-template-rows: repeat(5, 50px);
+				gap: 5px;
+				border: 2px solid #6c5a47;
+				padding: 5px;
+				background-color: #b99476;
+			}
+			.field {
+				width: 50px;
+				height: 50px;
+				background-color: #d1c1a2;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 1.8em;
+				cursor: pointer;
+				border: 1px solid #a8947b;
+				transition: transform 0.1s ease;
+			}
+			.field:hover {
+				transform: scale(1.05);
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>Emoji Farm</h1>
+			<div id="stats">Money: $<span id="money">0</span></div>
+			<div id="farm-grid"></div>
+			<p id="message">Click an empty field to plant a seed.</p>
+		</div>
+
+		<script>
+			const grid = document.getElementById("farm-grid");
+			const moneyElement = document.getElementById("money");
+			const messageElement = document.getElementById("message");
+
+			let money = 0;
+			let fields = [];
+
+			const FIELD_STATES = {
+				EMPTY: "⚫",
+				PLANTED: "🌱",
+				GROWING: "🌿",
+				MATURE: "🌻",
+			};
+
+			const GROW_TIME = 5; // Turns to grow
+
+			// Initialize the farm grid
+			function initFarm() {
+				for (let i = 0; i < 25; i++) {
+					const field = document.createElement("div");
+					field.classList.add("field");
+					field.dataset.index = i;
+					field.dataset.state = "empty";
+					field.dataset.growTime = 0;
+					field.textContent = FIELD_STATES.EMPTY;
+					field.addEventListener("click", handleFieldClick);
+					grid.appendChild(field);
+					fields.push(field);
+				}
+			}
+
+			// Handle player actions on a field
+			function handleFieldClick(event) {
+				const field = event.target;
+				const state = field.dataset.state;
+
+				switch (state) {
+					case "empty":
+						plantSeed(field);
+						break;
+					case "growing":
+					case "planted":
+						waterCrop(field);
+						break;
+					case "mature":
+						harvestCrop(field);
+						break;
+				}
+			}
+
+			function plantSeed(field) {
+				field.dataset.state = "planted";
+				field.dataset.growTime = GROW_TIME;
+				field.textContent = FIELD_STATES.PLANTED;
+				messageElement.textContent = "You planted a new crop!";
+				updateGame();
+			}
+
+			function waterCrop(field) {
+				if (field.dataset.growTime > 0) {
+					field.dataset.growTime--;
+					messageElement.textContent =
+						"You watered the crop. It will grow faster!";
+					updateGame();
+				}
+			}
+
+			function harvestCrop(field) {
+				money += 10; // Earn 10 money per crop
+				moneyElement.textContent = money;
+				field.dataset.state = "empty";
+				field.dataset.growTime = 0;
+				field.textContent = FIELD_STATES.EMPTY;
+				messageElement.textContent =
+					"You harvested a crop and earned $10!";
+			}
+
+			// Update the state of all crops each "turn"
+			function updateGame() {
+				fields.forEach((field) => {
+					let growTime = parseInt(field.dataset.growTime);
+					if (
+						field.dataset.state === "planted" ||
+						field.dataset.state === "growing"
+					) {
+						if (growTime > 0) {
+							field.dataset.growTime--;
+							// Change emoji to indicate progress
+							if (growTime === Math.floor(GROW_TIME / 2)) {
+								field.dataset.state = "growing";
+								field.textContent = FIELD_STATES.GROWING;
+							}
+						} else {
+							field.dataset.state = "mature";
+							field.textContent = FIELD_STATES.MATURE;
+							messageElement.textContent =
+								"A crop is ready to harvest!";
+						}
+					}
+				});
+			}
+
+			// A "game loop" that updates the game state every few seconds
+			setInterval(updateGame, 2000);
+
+			// Start the game
+			initFarm();
+		</script>
+	</body>
+</html>
