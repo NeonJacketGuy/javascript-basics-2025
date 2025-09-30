@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>3D Metroid-style Platformer</title>
+		<style>
+			body {
+				margin: 0;
+				overflow: hidden;
+				background-color: #000;
+			}
+			canvas {
+				display: block;
+			}
+			#info {
+				position: absolute;
+				top: 10px;
+				left: 10px;
+				color: white;
+				font-family: Arial, sans-serif;
+				font-size: 1.2em;
+				text-shadow: 1px 1px 2px black;
+				background-color: rgba(0, 0, 0, 0.5);
+				padding: 10px;
+				border-radius: 5px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="info">
+			Use A/D to move, Space to jump, and mouse-click to shoot.
+		</div>
+
+		<!-- Three.js Library included directly -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+		<script>
+			// --- SCENE SETUP ---
+			const scene = new THREE.Scene();
+			const camera = new THREE.PerspectiveCamera(
+				75,
+				window.innerWidth / window.innerHeight,
+				0.1,
+				1000
+			);
+			const renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			document.body.appendChild(renderer.domElement);
+
+			// Lighting
+			const ambientLight = new THREE.AmbientLight(0x404040, 2);
+			scene.add(ambientLight);
+			const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+			directionalLight.position.set(0, 5, 10);
+			scene.add(directionalLight);
+
+			// --- GAME OBJECTS ---
+			// Player
+			const playerGeometry = new THREE.BoxGeometry(1, 1.5, 1);
+			const playerMaterial = new THREE.MeshLambertMaterial({
+				color: 0x87ceeb,
+			});
+			const player = new THREE.Mesh(playerGeometry, playerMaterial);
+			player.position.set(0, 0.75, 5);
+			player.userData = {
+				velocity: new THREE.Vector3(0, 0, 0),
+				isGrounded: false,
+			};
+			scene.add(player);
+
+			// Enemy (simple box)
+			const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+			const enemyMaterial = new THREE.MeshLambertMaterial({
+				color: 0xff0000,
+			});
+			const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+			enemy.position.set(10, 0.5, 5);
+			enemy.userData = { direction: 1, health: 1 };
+			scene.add(enemy);
+
+			// Level (platforms)
+			const floorGeometry = new THREE.PlaneGeometry(30, 10);
+			const floorMaterial = new THREE.MeshLambertMaterial({
+				color: 0x666666,
+			});
+			const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+			floor.rotation.x = -Math.PI / 2;
+			floor.position.set(15, 0, 5);
+			scene.add(floor);
+
+			// --- GAME LOGIC ---
+			const gravity = -0.05;
+			const jumpStrength = 0.5;
+			const playerSpeed = 0.1;
+			const bulletSpeed = 0.5;
+			const bullets = [];
+
+			// Camera follow
+			camera.position.set(
+				player.position.x,
+				player.position.y + 5,
+				player.position.z + 5
+			);
+			camera.lookAt(player.position);
+
+			// Controls
+			const keys = {};
+			window.addEventListener("keydown", (e) => {
+				keys[e.key] = true;
+			});
+			window.addEventListener("keyup", (e) => {
+				keys[e.key] = false;
+			});
+			window.addEventListener("mousedown", (e) => {
+				if (e.button === 0) {
+					// Left-click
+					shoot();
+				}
+			});
+
+			function shoot() {
+				const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+				const bulletMaterial = new THREE.MeshBasicMaterial({
+					color: 0xffff00,
+				});
+				const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+				bullet.position.copy(player.position);
+				bullet.userData = {
+					velocity: new THREE.Vector3(1, 0, 0)
+						.applyQuaternion(camera.quaternion)
+						.multiplyScalar(bulletSpeed),
+				};
+				scene.add(bullet);
+				bullets.push(bullet);
+			}
+
+			// --- ANIMATION LOOP ---
+			const animate = () => {
+				requestAnimationFrame(animate);
+
+				// Player movement
+				if (keys["a"]) player.userData.velocity.x = -playerSpeed;
+				else if (keys["d"]) player.userData.velocity.x = playerSpeed;
+				else player.userData.velocity.x = 0;
+
+				if (keys[" "] && player.userData.isGrounded) {
+					player.userData.velocity.y = jumpStrength;
+					player.userData.isGrounded = false;
+				}
+
+				// Gravity
+				player.userData.velocity.y += gravity;
+
+				// Update player position
+				player.position.add(player.userData.velocity);
+
+				// Ground collision
+				if (player.position.y <= 0.75) {
+					player.position.y = 0.75;
+					player.userData.velocity.y = 0;
+					player.userData.isGrounded = true;
+				}
+
+				// Enemy behavior
+				if (enemy && enemy.userData.health > 0) {
+					if (enemy.position.x > 15) enemy.userData.direction = -1;
+					if (enemy.position.x < 5) enemy.userData.direction = 1;
+					enemy.position.x += 0.05 * enemy.userData.direction;
+				}
+
+				// Bullet logic
+				bullets.forEach((bullet, index) => {
+					bullet.position.add(bullet.userData.velocity);
+
+					// Bullet-enemy collision
+					if (enemy && enemy.userData.health > 0) {
+						const distance = bullet.position.distanceTo(
+							enemy.position
+						);
+						if (distance < 1) {
+							// Simple collision check
+							enemy.userData.health = 0;
+							scene.remove(enemy);
+							scene.remove(bullet);
+							bullets.splice(index, 1);
+						}
+					}
+				});
+
+				// Camera update
+				camera.position.x = player.position.x;
+				camera.lookAt(player.position);
+
+				renderer.render(scene, camera);
+			};
+
+			animate();
+		</script>
+	</body>
+</html>
