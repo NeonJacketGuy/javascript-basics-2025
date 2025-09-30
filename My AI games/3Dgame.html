@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Roll & Collect — Single File 3D Game</title>
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<style>
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+				background: #111;
+			}
+			canvas {
+				display: block;
+			}
+			#hud {
+				position: absolute;
+				top: 12px;
+				left: 12px;
+				color: #fff;
+				font-family: system-ui, -apple-system, "Segoe UI", Roboto,
+					"Helvetica Neue", Arial;
+				user-select: none;
+				text-shadow: 0 1px 0 #0009;
+			}
+			#score {
+				font-size: 20px;
+				margin-bottom: 6px;
+			}
+			#message {
+				position: absolute;
+				right: 12px;
+				top: 12px;
+				color: #fff;
+				background: rgba(0, 0, 0, 0.35);
+				padding: 8px 10px;
+				border-radius: 8px;
+				font-size: 13px;
+			}
+			#overlay {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				pointer-events: none;
+			}
+			#centerBox {
+				pointer-events: auto;
+				background: rgba(0, 0, 0, 0.6);
+				color: #fff;
+				padding: 16px;
+				border-radius: 12px;
+				text-align: center;
+				max-width: 420px;
+			}
+			button {
+				background: #28a;
+				color: #fff;
+				border: 0;
+				padding: 8px 12px;
+				border-radius: 8px;
+				cursor: pointer;
+				font-size: 14px;
+				margin-top: 8px;
+			}
+			button:active {
+				transform: translateY(1px);
+			}
+			#help {
+				font-size: 13px;
+				opacity: 0.9;
+				margin-top: 8px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="hud">
+			<div id="score">Score: 0</div>
+			<div style="font-size: 13px; opacity: 0.85">
+				Collect all coins! Avoid big red blocks.
+			</div>
+		</div>
+		<div id="message">WASD / Arrow keys to move — Space to jump</div>
+
+		<div id="overlay">
+			<div id="centerBox">
+				<div style="font-size: 18px; font-weight: 600">
+					Roll & Collect
+				</div>
+				<div id="help">
+					Collect all coins scattered across the field. Press
+					<b>Start</b> when ready.
+				</div>
+				<div style="margin-top: 10px">
+					<button id="startBtn">Start</button>
+					<button
+						id="restartBtn"
+						style="margin-left: 8px; display: none"
+					>
+						Restart
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Three.js UMD build from CDN -->
+		<script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+
+		<script>
+			// ======= Game constants =======
+			const WORLD_SIZE = 140;
+			const NUM_COINS = 12;
+			const NUM_BLOCKS = 18;
+			const PLAYER_RADIUS = 1.6;
+			const GRAVITY = -30; // stronger gravity for snappy feel
+			const MOVE_SPEED = 14;
+			const JUMP_SPEED = 12;
+
+			// ======= Basic Three.js setup =======
+			let scene = new THREE.Scene();
+			scene.background = new THREE.Color(0x87ceeb); // sky-ish
+			const camera = new THREE.PerspectiveCamera(
+				60,
+				innerWidth / innerHeight,
+				0.1,
+				1000
+			);
+			const renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setSize(innerWidth, innerHeight);
+			document.body.appendChild(renderer.domElement);
+
+			window.addEventListener("resize", () => {
+				camera.aspect = innerWidth / innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize(innerWidth, innerHeight);
+			});
+
+			// ======= Lights =======
+			const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+			dirLight.position.set(10, 25, 10);
+			scene.add(dirLight);
+			scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+			// ======= Ground =======
+			const groundMat = new THREE.MeshStandardMaterial({
+				color: 0x2b7a00,
+				roughness: 1,
+			});
+			const groundGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE);
+			const ground = new THREE.Mesh(groundGeo, groundMat);
+			ground.rotation.x = -Math.PI / 2;
+			ground.receiveShadow = true;
+			scene.add(ground);
+
+			// subtle grid on ground
+			const grid = new THREE.GridHelper(
+				WORLD_SIZE,
+				40,
+				0x111111,
+				0x0f0f0f
+			);
+			grid.position.y = 0.001;
+			scene.add(grid);
+
+			// ======= Player (ball) =======
+			const playerMat = new THREE.MeshStandardMaterial({
+				color: 0x1644ff,
+				metalness: 0.2,
+				roughness: 0.4,
+			});
+			const playerGeo = new THREE.SphereGeometry(PLAYER_RADIUS, 32, 32);
+			const playerMesh = new THREE.Mesh(playerGeo, playerMat);
+			playerMesh.castShadow = true;
+			scene.add(playerMesh);
+
+			// physics-ish state
+			let player = {
+				pos: new THREE.Vector3(0, PLAYER_RADIUS + 0.1, 0),
+				vel: new THREE.Vector3(0, 0, 0),
+				radius: PLAYER_RADIUS,
+				onGround: false,
+			};
+
+			// ======= Obstacles (red blocks) =======
+			const blocks = [];
+			function spawnBlocks() {
+				const blockGeo = new THREE.BoxGeometry(3.6, 3.6, 3.6);
+				const blockMat = new THREE.MeshStandardMaterial({
+					color: 0xcc2222,
+					roughness: 0.8,
+				});
+				for (let i = 0; i < NUM_BLOCKS; i++) {
+					const m = new THREE.Mesh(blockGeo, blockMat);
+					// place blocks randomly within world, but leave center area clear
+					const r = 8 + Math.random() * (WORLD_SIZE / 2 - 10);
+					const a = Math.random() * Math.PI * 2;
+					m.position.set(
+						Math.cos(a) * r + (Math.random() - 0.5) * 6,
+						1.8,
+						Math.sin(a) * r + (Math.random() - 0.5) * 6
+					);
+					m.userData = { radius: Math.sqrt(3.6 * 3.6 * 3) / 2 }; // approx half-diagonal for collision
+					scene.add(m);
+					blocks.push(m);
+				}
+			}
+
+			// ======= Coins =======
+			const coins = [];
+			function spawnCoins() {
+				const coinGeo = new THREE.SphereGeometry(0.9, 16, 12);
+				const coinMat = new THREE.MeshStandardMaterial({
+					color: 0xffd54f,
+					emissive: 0x664400,
+					roughness: 0.3,
+				});
+				for (let i = 0; i < NUM_COINS; i++) {
+					const m = new THREE.Mesh(coinGeo, coinMat);
+					const r = 6 + Math.random() * (WORLD_SIZE / 2 - 14);
+					const a = Math.random() * Math.PI * 2;
+					m.position.set(Math.cos(a) * r, 0.9, Math.sin(a) * r);
+					m.userData = { collected: false, radius: 0.9 };
+					scene.add(m);
+					coins.push(m);
+
+					// little floating animation anchor
+					m.userData.floatOffset = Math.random() * Math.PI * 2;
+				}
+			}
+
+			// ======= UI =======
+			const scoreEl = document.getElementById("score");
+			const overlay = document.getElementById("overlay");
+			const startBtn = document.getElementById("startBtn");
+			const restartBtn = document.getElementById("restartBtn");
+			let score = 0;
+
+			function setScore(n) {
+				score = n;
+				scoreEl.textContent = "Score: " + score;
+			}
+
+			// ======= Input =======
+			const keys = { forward: 0, back: 0, left: 0, right: 0, jump: 0 };
+			window.addEventListener("keydown", (e) => {
+				if (["ArrowUp", "KeyW"].includes(e.code)) keys.forward = 1;
+				if (["ArrowDown", "KeyS"].includes(e.code)) keys.back = 1;
+				if (["ArrowLeft", "KeyA"].includes(e.code)) keys.left = 1;
+				if (["ArrowRight", "KeyD"].includes(e.code)) keys.right = 1;
+				if (["Space"].includes(e.code)) keys.jump = 1;
+			});
+			window.addEventListener("keyup", (e) => {
+				if (["ArrowUp", "KeyW"].includes(e.code)) keys.forward = 0;
+				if (["ArrowDown", "KeyS"].includes(e.code)) keys.back = 0;
+				if (["ArrowLeft", "KeyA"].includes(e.code)) keys.left = 0;
+				if (["ArrowRight", "KeyD"].includes(e.code)) keys.right = 0;
+				if (["Space"].includes(e.code)) keys.jump = 0;
+			});
+
+			// ======= Camera follow variables =======
+			const camOffset = new THREE.Vector3(0, 8.5, 12);
+
+			// ======= Simple collision helpers =======
+			function sphereBoxCollisionResolve(
+				spherePos,
+				sphereRadius,
+				boxMesh
+			) {
+				// approximate box by its bounding box centered on boxMesh.position with half-sizes
+				const box = new THREE.Box3().setFromObject(boxMesh);
+				// closest point on box to sphere center
+				const closest = new THREE.Vector3(
+					Math.max(box.min.x, Math.min(spherePos.x, box.max.x)),
+					Math.max(box.min.y, Math.min(spherePos.y, box.max.y)),
+					Math.max(box.min.z, Math.min(spherePos.z, box.max.z))
+				);
+				const diff = new THREE.Vector3().subVectors(spherePos, closest);
+				const dist = diff.length();
+				if (dist < sphereRadius - 0.0001) {
+					// push sphere out along diff direction
+					if (dist === 0) diff.set(0, 1, 0); // avoid divide by zero
+					diff.normalize();
+					const penetration = sphereRadius - dist;
+					spherePos.add(diff.multiplyScalar(penetration + 0.001));
+					// simple reflect velocity
+					player.vel.multiplyScalar(0.8);
+					return true;
+				}
+				return false;
+			}
+
+			// ======= Game loop =======
+			let lastTime = performance.now() / 1000;
+			let running = false;
+
+			function resetGame() {
+				// remove previous coins and blocks
+				blocks.forEach((b) => scene.remove(b));
+				coins.forEach((c) => scene.remove(c));
+				blocks.length = 0;
+				coins.length = 0;
+
+				player.pos.set(0, PLAYER_RADIUS + 0.1, 0);
+				player.vel.set(0, 0, 0);
+				player.onGround = false;
+				playerMesh.position.copy(player.pos);
+
+				setScore(0);
+				spawnBlocks();
+				spawnCoins();
+			}
+
+			function startGame() {
+				resetGame();
+				overlay.style.display = "none";
+				startBtn.style.display = "none";
+				restartBtn.style.display = "inline-block";
+				running = true;
+				lastTime = performance.now() / 1000;
+			}
+
+			startBtn.addEventListener("click", startGame);
+			restartBtn.addEventListener("click", () => {
+				resetGame();
+				running = true;
+				overlay.style.display = "none";
+			});
+
+			// ======= Simple "win" / end check =======
+			function checkWin() {
+				if (score >= NUM_COINS) {
+					running = false;
+					document.getElementById("help").innerHTML =
+						"<b>You collected them all! 🎉</b><br>Press Restart to play again.";
+					overlay.style.display = "flex";
+					document.getElementById("centerBox").focus();
+					startBtn.style.display = "none";
+					restartBtn.style.display = "inline-block";
+				}
+			}
+
+			// ======= Create horizon markers and subtle scenery =======
+			(function addScenery() {
+				const treeMat = new THREE.MeshStandardMaterial({
+					color: 0x0b5d00,
+				});
+				const trunkMat = new THREE.MeshStandardMaterial({
+					color: 0x7b4b2b,
+				});
+				for (let i = 0; i < 24; i++) {
+					const h = 2 + Math.random() * 4;
+					const trunk = new THREE.Mesh(
+						new THREE.CylinderGeometry(0.18, 0.4, h, 8),
+						trunkMat
+					);
+					const leaves = new THREE.Mesh(
+						new THREE.ConeGeometry(
+							0.9 + Math.random() * 1.4,
+							2 + Math.random() * 2,
+							8
+						),
+						treeMat
+					);
+					const r = 30 + Math.random() * 60;
+					const a = Math.random() * Math.PI * 2;
+					trunk.position.set(Math.cos(a) * r, h / 2, Math.sin(a) * r);
+					leaves.position.set(
+						trunk.position.x,
+						trunk.position.y + h / 2 + 0.8,
+						trunk.position.z
+					);
+					scene.add(trunk);
+					scene.add(leaves);
+				}
+			})();
+
+			// ======= Main animation loop =======
+			function animate() {
+				requestAnimationFrame(animate);
+				const t = performance.now() / 1000;
+				const dt = Math.min(0.033, t - lastTime); // clamp dt
+				lastTime = t;
+				if (running) {
+					// Basic movement vector in local frame (world-aligned)
+					const forward = keys.forward ? 1 : 0;
+					const back = keys.back ? 1 : 0;
+					const left = keys.left ? 1 : 0;
+					const right = keys.right ? 1 : 0;
+
+					// Movement direction
+					const dir = new THREE.Vector3(
+						right - left,
+						0,
+						back - forward
+					);
+					if (dir.lengthSq() > 0) {
+						dir.normalize();
+						// allow diagonal speed normalization
+						const intended = dir.multiplyScalar(MOVE_SPEED);
+						// smooth acceleration — we simply set horizontal velocity toward intended
+						player.vel.x = THREE.MathUtils.damp(
+							player.vel.x,
+							intended.x,
+							6,
+							dt
+						);
+						player.vel.z = THREE.MathUtils.damp(
+							player.vel.z,
+							intended.z,
+							6,
+							dt
+						);
+					} else {
+						// friction to stop
+						player.vel.x = THREE.MathUtils.damp(
+							player.vel.x,
+							0,
+							6,
+							dt
+						);
+						player.vel.z = THREE.MathUtils.damp(
+							player.vel.z,
+							0,
+							6,
+							dt
+						);
+					}
+
+					// Jump
+					if (keys.jump && player.onGround) {
+						player.vel.y = JUMP_SPEED;
+						player.onGround = false;
+					}
+
+					// gravity
+					player.vel.y += GRAVITY * dt;
+
+					// integrate
+					player.pos.addScaledVector(player.vel, dt);
+
+					// ground collision
+					if (player.pos.y <= PLAYER_RADIUS + 0.05) {
+						player.pos.y = PLAYER_RADIUS + 0.05;
+						if (player.vel.y < 0) player.vel.y = 0;
+						player.onGround = true;
+					} else {
+						player.onGround = false;
+					}
+
+					// block collisions
+					blocks.forEach((b) =>
+						sphereBoxCollisionResolve(player.pos, player.radius, b)
+					);
+
+					// keep player inside world bounds (soft)
+					const half = WORLD_SIZE / 2 - 2;
+					if (player.pos.x > half) player.pos.x = half;
+					if (player.pos.x < -half) player.pos.x = -half;
+					if (player.pos.z > half) player.pos.z = half;
+					if (player.pos.z < -half) player.pos.z = -half;
+
+					// update mesh position
+					playerMesh.position.copy(player.pos);
+
+					// spin the ball visually based on horizontal movement
+					const spinAxis = new THREE.Vector3(
+						player.vel.z,
+						0,
+						-player.vel.x
+					).normalize();
+					const groundSpeed = Math.sqrt(
+						player.vel.x * player.vel.x +
+							player.vel.z * player.vel.z
+					);
+					playerMesh.rotateOnAxis(
+						spinAxis,
+						(groundSpeed * dt) / PLAYER_RADIUS
+					);
+
+					// coin checks
+					coins.forEach((c) => {
+						if (c.userData.collected) return;
+						// float effect
+						c.position.y =
+							0.9 +
+							Math.sin(t * 2 + c.userData.floatOffset) * 0.22;
+						const d = c.position.distanceTo(player.pos);
+						if (d < player.radius + c.userData.radius - 0.2) {
+							c.userData.collected = true;
+							// small scale pop and remove
+							scene.remove(c);
+							setScore(score + 1);
+						}
+					});
+
+					checkWin();
+				}
+
+				// camera smoothing and follow
+				const desiredCamPos = new THREE.Vector3()
+					.copy(player.pos)
+					.add(camOffset);
+				// look a bit forward in direction of movement
+				const forwardLook = new THREE.Vector3(
+					player.vel.x,
+					0,
+					player.vel.z
+				).multiplyScalar(0.6);
+				const lookAt = new THREE.Vector3()
+					.copy(player.pos)
+					.add(forwardLook);
+				// smooth camera position
+				camera.position.lerp(desiredCamPos, 0.12);
+				camera.position.y = Math.max(
+					camera.position.y,
+					player.pos.y + 3.5
+				);
+				camera.lookAt(lookAt);
+
+				renderer.render(scene, camera);
+			}
+
+			// start loop immediately so scene renders even before start
+			animate();
+
+			// initial placement
+			playerMesh.position.copy(player.pos);
+			camera.position.copy(player.pos).add(camOffset);
+			camera.lookAt(player.pos);
+
+			// spawn initial things (will be reset when Start pressed)
+			spawnBlocks();
+			spawnCoins();
+
+			// small keyboard hint focus
+			window.addEventListener("keydown", (e) => {
+				if (e.key === "Enter" && overlay.style.display !== "none") {
+					startGame();
+				}
+			});
+
+			// Prevent accidental scrolling with arrow keys/space
+			window.addEventListener(
+				"keydown",
+				function (e) {
+					if (
+						[
+							"Space",
+							"ArrowUp",
+							"ArrowDown",
+							"ArrowLeft",
+							"ArrowRight",
+							"KeyW",
+							"KeyA",
+							"KeyS",
+							"KeyD",
+						].indexOf(e.code) > -1
+					) {
+						e.preventDefault();
+					}
+				},
+				false
+			);
+
+			// Expose a cheat-ish button for dev testing (not shown initially)
+			// developer convenience: press 'R' to respawn coins (hidden feature)
+			window.addEventListener("keydown", (e) => {
+				if (e.code === "KeyR" && running) {
+					// respawn coins at new places
+					coins.forEach((c) => scene.remove(c));
+					coins.length = 0;
+					spawnCoins();
+					setScore(0);
+				}
+			});
+		</script>
+	</body>
+</html>
