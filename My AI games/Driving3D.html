@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Mini 3D Driving Game — All in HTML</title>
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<style>
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+				overflow: hidden;
+				font-family: Segoe UI, Arial, sans-serif;
+				background: #111;
+				color: #fff;
+			}
+			#container {
+				position: fixed;
+				inset: 0;
+			}
+			#hud {
+				position: absolute;
+				left: 12px;
+				top: 12px;
+				z-index: 10;
+				background: rgba(0, 0, 0, 0.35);
+				padding: 10px;
+				border-radius: 8px;
+				min-width: 160px;
+				backdrop-filter: blur(3px);
+			}
+			#hud h1 {
+				margin: 0 0 6px 0;
+				font-size: 16px;
+			}
+			#speed {
+				font-size: 22px;
+				font-weight: 700;
+			}
+			#lap {
+				margin-top: 6px;
+				font-size: 14px;
+			}
+			#controls {
+				position: absolute;
+				right: 12px;
+				top: 12px;
+				background: rgba(0, 0, 0, 0.35);
+				padding: 10px;
+				border-radius: 8px;
+			}
+			.small {
+				font-size: 12px;
+				opacity: 0.9;
+			}
+			#message {
+				position: absolute;
+				left: 50%;
+				top: 20%;
+				transform: translateX(-50%);
+				background: rgba(0, 0, 0, 0.7);
+				padding: 12px 18px;
+				border-radius: 8px;
+				font-size: 18px;
+				display: none;
+				z-index: 11;
+			}
+			canvas {
+				display: block;
+			}
+			#minimap {
+				position: absolute;
+				right: 12px;
+				bottom: 12px;
+				width: 180px;
+				height: 120px;
+				background: rgba(0, 0, 0, 0.35);
+				border-radius: 8px;
+				padding: 6px;
+			}
+			#minimap canvas {
+				width: 100%;
+				height: 100%;
+				display: block;
+				background: #0b0b0b;
+				border-radius: 6px;
+			}
+			a.small {
+				color: #90ee90;
+				text-decoration: none;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="container"></div>
+
+		<div id="hud">
+			<h1>3D Drive</h1>
+			<div id="speed">Speed: 0 km/h</div>
+			<div id="lap">Lap: 0 / 3</div>
+			<div class="small" style="margin-top: 6px">
+				W/S or ↑/↓ to accelerate/brake — A/D or ←/→ to steer — R to
+				reset
+			</div>
+		</div>
+
+		<div id="controls" class="small">
+			<div>Time: <span id="time">0.00</span>s</div>
+			<div style="margin-top: 6px">
+				Checkpoints: <span id="cp">0</span>/<span id="cpTotal">0</span>
+			</div>
+		</div>
+
+		<div id="message"></div>
+
+		<div id="minimap">
+			<canvas id="mm" width="360" height="240"></canvas>
+		</div>
+
+		<!-- Three.js from CDN -->
+		<script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
+		<script>
+			// ---------- Simple 3D Driving Game ----------
+			// Highly-commented so you can tweak things in VSCode.
+			(function () {
+				const container = document.getElementById("container");
+				const messageEl = document.getElementById("message");
+				const speedEl = document.getElementById("speed");
+				const lapEl = document.getElementById("lap");
+				const timeEl = document.getElementById("time");
+				const cpEl = document.getElementById("cp");
+				const cpTotalEl = document.getElementById("cpTotal");
+
+				// Renderer
+				const renderer = new THREE.WebGLRenderer({ antialias: true });
+				renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+				renderer.setSize(window.innerWidth, window.innerHeight);
+				renderer.shadowMap.enabled = true;
+				container.appendChild(renderer.domElement);
+
+				// Scene & Camera
+				const scene = new THREE.Scene();
+				scene.fog = new THREE.FogExp2(0x101218, 0.0022);
+				const camera = new THREE.PerspectiveCamera(
+					60,
+					window.innerWidth / window.innerHeight,
+					0.1,
+					2000
+				);
+				camera.position.set(0, 6, -12);
+
+				// Lights
+				const hemi = new THREE.HemisphereLight(0xbfdfff, 0x404040, 0.6);
+				scene.add(hemi);
+				const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+				dir.position.set(10, 20, 10);
+				dir.castShadow = true;
+				dir.shadow.mapSize.set(2048, 2048);
+				dir.shadow.camera.near = 1;
+				dir.shadow.camera.far = 100;
+				dir.shadow.camera.left = -40;
+				dir.shadow.camera.right = 40;
+				dir.shadow.camera.top = 40;
+				dir.shadow.camera.bottom = -40;
+				scene.add(dir);
+
+				// Ground
+				const groundMat = new THREE.MeshStandardMaterial({
+					color: 0x2b7a2b,
+					roughness: 1,
+				});
+				const ground = new THREE.Mesh(
+					new THREE.PlaneGeometry(1200, 1200),
+					groundMat
+				);
+				ground.rotation.x = -Math.PI / 2;
+				ground.receiveShadow = true;
+				scene.add(ground);
+
+				// Road (simple loop)
+				const road = new THREE.Mesh(
+					new THREE.PlaneGeometry(240, 18),
+					new THREE.MeshStandardMaterial({ color: 0x333333 })
+				);
+				road.rotation.x = -Math.PI / 2;
+				road.position.y = 0.01;
+				scene.add(road);
+
+				// Curved track path (using circle + a few straight segments via geometry)
+				const trackPoints = [];
+				const radius = 60;
+				for (let a = 0; a < Math.PI * 2; a += Math.PI / 32) {
+					const x =
+						Math.cos(a) * radius * (1 + 0.18 * Math.sin(4 * a));
+					const z = Math.sin(a) * radius;
+					trackPoints.push(new THREE.Vector3(x, 0, z));
+				}
+				// Visualize track (thin line)
+				const trackGeom = new THREE.BufferGeometry().setFromPoints(
+					trackPoints
+				);
+				const trackLine = new THREE.Line(
+					trackGeom,
+					new THREE.LineBasicMaterial({ color: 0xffffaa })
+				);
+				trackLine.rotation.x = -Math.PI / 2;
+				scene.add(trackLine);
+
+				// Add some obstacles / cones
+				const coneGeo = new THREE.ConeGeometry(0.7, 1.6, 8);
+				const coneMat = new THREE.MeshStandardMaterial({
+					color: 0xff5500,
+				});
+				const obstacles = [];
+				for (let i = 0; i < 18; i++) {
+					const p =
+						trackPoints[
+							Math.floor(Math.random() * trackPoints.length)
+						];
+					const cone = new THREE.Mesh(coneGeo, coneMat);
+					cone.position.set(
+						p.x + (Math.random() - 0.5) * 8,
+						0.8,
+						p.z + (Math.random() - 0.5) * 8
+					);
+					cone.castShadow = true;
+					scene.add(cone);
+					obstacles.push(cone);
+				}
+
+				// Checkpoints (place a few around track)
+				const checkpoints = [];
+				const cpCount = 5;
+				for (let i = 0; i < cpCount; i++) {
+					const idx = Math.floor((i * trackPoints.length) / cpCount);
+					const p = trackPoints[idx];
+					const ring = new THREE.Mesh(
+						new THREE.TorusGeometry(6, 0.2, 8, 48),
+						new THREE.MeshBasicMaterial({ color: 0x66ccff })
+					);
+					ring.rotation.x = Math.PI / 2;
+					ring.position.set(p.x, 2.6, p.z);
+					ring.userData = { index: i };
+					scene.add(ring);
+					checkpoints.push(ring);
+				}
+				cpTotalEl.textContent = checkpoints.length;
+
+				// Car (box + four cylinders)
+				const car = new THREE.Group();
+				const body = new THREE.Mesh(
+					new THREE.BoxGeometry(2.8, 0.9, 4.8),
+					new THREE.MeshStandardMaterial({ color: 0x1e90ff })
+				);
+				body.position.y = 1.1;
+				body.castShadow = true;
+				car.add(body);
+
+				const wheelGeo = new THREE.CylinderGeometry(
+					0.45,
+					0.45,
+					0.6,
+					16
+				);
+				const wheelMat = new THREE.MeshStandardMaterial({
+					color: 0x111111,
+				});
+				function makeWheel(x, z) {
+					const w = new THREE.Mesh(wheelGeo, wheelMat);
+					w.rotation.z = Math.PI / 2;
+					w.position.set(x, 0.45, z);
+					w.castShadow = true;
+					car.add(w);
+					return w;
+				}
+				const w1 = makeWheel(-1.1, -1.6);
+				const w2 = makeWheel(1.1, -1.6);
+				const w3 = makeWheel(-1.1, 1.6);
+				const w4 = makeWheel(1.1, 1.6);
+
+				car.position.set(trackPoints[0].x, 0, trackPoints[0].z);
+				car.rotation.y =
+					Math.atan2(
+						trackPoints[1].x - trackPoints[0].x,
+						trackPoints[1].z - trackPoints[0].z
+					) + Math.PI;
+				car.castShadow = true;
+				scene.add(car);
+
+				// Simple driving state
+				let velocity = 0; // forward speed (units/s)
+				let steering = 0; // radians
+				const maxSpeed = 70; // km/h equivalent scaled (game units)
+				const maxVel = 22; // world units per second
+				const accel = 18; // acceleration units
+				const brake = 40;
+				const steerSpeed = 1.9; // steering responsiveness
+
+				// Input
+				const keys = {};
+				window.addEventListener("keydown", (e) => {
+					keys[e.key.toLowerCase()] = true;
+					if (e.key === "r" || e.key === "R") resetCar();
+				});
+				window.addEventListener("keyup", (e) => {
+					keys[e.key.toLowerCase()] = false;
+				});
+
+				// Timing
+				let lastTime = performance.now();
+				let startTime = performance.now();
+				let lap = 0;
+				let cpIndex = 0;
+				let best = null;
+
+				cpEl.textContent = cpIndex;
+
+				// Camera follow smoothing
+				function updateCamera() {
+					const desired = new THREE.Vector3();
+					// camera follows behind and slightly above
+					desired.copy(car.position);
+					const back = new THREE.Vector3(0, 2, -8).applyQuaternion(
+						car.quaternion
+					);
+					desired.add(back);
+					// LERP camera to desired
+					camera.position.lerp(desired, 0.12);
+					// Look at car
+					const lookAt = new THREE.Vector3()
+						.copy(car.position)
+						.add(new THREE.Vector3(0, 1.2, 0));
+					camera.lookAt(lookAt);
+				}
+
+				// Simple collision detection with cones (sphere vs cylinder approximation)
+				function handleCollisions(delta) {
+					for (const o of obstacles) {
+						const d = o.position.distanceTo(car.position);
+						if (d < 2.2) {
+							// simple bounce and slow down
+							velocity *= -0.35;
+							// push car away
+							const push = car.position
+								.clone()
+								.sub(o.position)
+								.normalize()
+								.multiplyScalar(1.4);
+							car.position.add(push);
+							flashMessage("Oof! Hit a cone.", 700);
+						}
+					}
+				}
+
+				function flashMessage(text, ms = 1200) {
+					messageEl.textContent = text;
+					messageEl.style.display = "block";
+					clearTimeout(messageEl._timeout);
+					messageEl._timeout = setTimeout(
+						() => (messageEl.style.display = "none"),
+						ms
+					);
+				}
+
+				// Track/checkpoint detection
+				function checkCheckpoints() {
+					const cp = checkpoints[cpIndex];
+					const d = cp.position.distanceTo(car.position);
+					if (d < 8.0) {
+						cpIndex = (cpIndex + 1) % checkpoints.length;
+						cpEl.textContent = cpIndex;
+						// if we've looped back to zero, got a lap
+						if (cpIndex === 0) {
+							lap++;
+							const lapTime =
+								(performance.now() - startTime) / 1000;
+							startTime = performance.now();
+							flashMessage(
+								`Lap ${lap} done! ${lapTime.toFixed(2)}s`,
+								1400
+							);
+							if (best === null || lapTime < best) best = lapTime;
+						}
+					}
+				}
+
+				// Reset car to start
+				function resetCar() {
+					car.position.set(trackPoints[0].x, 0, trackPoints[0].z);
+					car.rotation.y =
+						Math.atan2(
+							trackPoints[1].x - trackPoints[0].x,
+							trackPoints[1].z - trackPoints[0].z
+						) + Math.PI;
+					velocity = 0;
+					steering = 0;
+					flashMessage("Reset");
+				}
+
+				// Minimap drawing
+				const mm = document.getElementById("mm");
+				const mmCtx = mm.getContext("2d");
+				function drawMinimap() {
+					mmCtx.clearRect(0, 0, mm.width, mm.height);
+					mmCtx.fillStyle = "#071016";
+					mmCtx.fillRect(0, 0, mm.width, mm.height);
+					// transform world coordinates into minimap
+					const scale = 1.6;
+					const centerX = mm.width / 2,
+						centerY = mm.height / 2;
+					mmCtx.strokeStyle = "#5b8c5b";
+					mmCtx.lineWidth = 2;
+					mmCtx.beginPath();
+					mmCtx.moveTo(
+						centerX + trackPoints[0].x / scale,
+						centerY + trackPoints[0].z / scale
+					);
+					for (const p of trackPoints) {
+						mmCtx.lineTo(
+							centerX + p.x / scale,
+							centerY + p.z / scale
+						);
+					}
+					mmCtx.closePath();
+					mmCtx.stroke();
+
+					// draw obstacles
+					mmCtx.fillStyle = "#ff6b3b";
+					for (const o of obstacles) {
+						mmCtx.fillRect(
+							centerX + o.position.x / scale - 2,
+							centerY + o.position.z / scale - 2,
+							4,
+							4
+						);
+					}
+
+					// car
+					mmCtx.fillStyle = "#6fc3ff";
+					mmCtx.beginPath();
+					mmCtx.arc(
+						centerX + car.position.x / scale,
+						centerY + car.position.z / scale,
+						4,
+						0,
+						Math.PI * 2
+					);
+					mmCtx.fill();
+				}
+
+				// Main loop
+				function animate(now) {
+					const dt = Math.min((now - lastTime) / 1000, 0.05);
+					lastTime = now;
+
+					// Controls: forward/back & steering
+					let forward = 0;
+					if (keys["w"] || keys["arrowup"]) forward = 1;
+					if (keys["s"] || keys["arrowdown"]) forward = -1;
+					// braking stronger when pressing S
+					if (forward > 0) velocity += accel * dt;
+					else if (forward < 0) velocity -= brake * dt;
+					else {
+						// natural drag
+						if (velocity > 0) velocity -= 10 * dt;
+						else if (velocity < 0) velocity += 10 * dt;
+					}
+
+					velocity = Math.max(Math.min(velocity, maxVel), -8);
+
+					// steering
+					let steerInput = 0;
+					if (keys["a"] || keys["arrowleft"]) steerInput = 1;
+					if (keys["d"] || keys["arrowright"]) steerInput = -1;
+					// steering scaled by speed (can't turn much when stopped)
+					const steerAmount =
+						steerInput *
+						steerSpeed *
+						Math.min(1, Math.abs(velocity) / 8);
+					steering += (steerAmount - steering) * Math.min(1, 6 * dt);
+					// apply rotation based on steering and velocity
+					const turn =
+						steering *
+						(velocity * 0.08) *
+						dt *
+						(velocity >= 0 ? 1 : -1);
+					car.rotation.y += turn;
+
+					// move car forward in local Z
+					const forwardVec = new THREE.Vector3(0, 0, 1)
+						.applyQuaternion(car.quaternion)
+						.multiplyScalar(velocity * dt);
+					car.position.add(forwardVec);
+
+					// keep car on ground y=0
+					car.position.y = 0;
+
+					// small tilt when steering
+					body.rotation.z = steering * 0.45;
+
+					// wheel rotation visual
+					const wheelSpin = velocity * dt * 6;
+					for (const w of [w1, w2, w3, w4]) w.rotation.x += wheelSpin;
+
+					// collisions
+					handleCollisions(dt);
+
+					// checkpoints/laps
+					checkCheckpoints();
+
+					// update HUD
+					const kmh = Math.round((velocity / maxVel) * maxSpeed);
+					speedEl.textContent = `Speed: ${kmh} km/h`;
+					lapEl.textContent = `Lap: ${lap} / 3`;
+					const elapsed = (
+						(performance.now() - startTime) /
+						1000
+					).toFixed(2);
+					timeEl.textContent = elapsed;
+
+					// draw minimap and camera
+					drawMinimap();
+					updateCamera();
+
+					renderer.render(scene, camera);
+
+					// end if completed 3 laps
+					if (lap >= 3) {
+						flashMessage(
+							`You finished 3 laps! Best: ${
+								best ? best.toFixed(2) : "—"
+							}s`,
+							4000
+						);
+						// freeze game by not requesting another frame for 2.5s, then reset everything
+						setTimeout(() => {
+							lap = 0;
+							cpIndex = 0;
+							cpEl.textContent = cpIndex;
+							lapEl.textContent = `Lap: ${lap} / 3`;
+							resetCar();
+						}, 2500);
+					} else {
+						requestAnimationFrame(animate);
+					}
+				}
+
+				// Handle resizing
+				window.addEventListener("resize", () => {
+					camera.aspect = window.innerWidth / window.innerHeight;
+					camera.updateProjectionMatrix();
+					renderer.setSize(window.innerWidth, window.innerHeight);
+				});
+
+				// Kick off
+				resetCar();
+				lastTime = performance.now();
+				startTime = performance.now();
+				requestAnimationFrame(animate);
+
+				// Optional: show pointers for toggles
+				flashMessage(
+					"Ready! Drive with W/A/S/D or Arrows — R to reset",
+					2200
+				);
+			})();
+		</script>
+	</body>
+</html>
