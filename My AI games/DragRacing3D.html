@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Simple 3D Drag Race</title>
+		<style>
+			body {
+				margin: 0;
+				overflow: hidden;
+			}
+			canvas {
+				display: block;
+			}
+			#overlay {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				color: white;
+				font-family: Arial, sans-serif;
+				font-size: 24px;
+				text-align: center;
+			}
+			#instructions {
+				position: absolute;
+				bottom: 20px;
+				left: 50%;
+				transform: translateX(-50%);
+				color: white;
+				font-family: Arial, sans-serif;
+				font-size: 16px;
+				text-align: center;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="overlay">Press SPACE to start</div>
+		<div id="instructions">
+			W or Up Arrow: Accelerate | S or Down Arrow: Brake
+		</div>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "https://cdn.skypack.dev/three@0.150.1"
+				}
+			}
+		</script>
+		<script type="module">
+			import * as THREE from "three";
+
+			// Scene setup
+			const scene = new THREE.Scene();
+			const camera = new THREE.PerspectiveCamera(
+				75,
+				window.innerWidth / window.innerHeight,
+				0.1,
+				1000
+			);
+			const renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			document.body.appendChild(renderer.domElement);
+
+			// Lighting
+			const ambientLight = new THREE.AmbientLight(0x404040);
+			scene.add(ambientLight);
+			const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+			directionalLight.position.set(0, 10, 10);
+			scene.add(directionalLight);
+
+			// Road
+			const roadTexture = new THREE.TextureLoader().load(
+				"https://threejs.org/examples/textures/hardwood2_diffuse.jpg"
+			);
+			roadTexture.wrapS = THREE.RepeatWrapping;
+			roadTexture.wrapT = THREE.RepeatWrapping;
+			roadTexture.repeat.set(1, 100);
+			const roadGeometry = new THREE.PlaneGeometry(10, 500);
+			const roadMaterial = new THREE.MeshLambertMaterial({
+				map: roadTexture,
+			});
+			const road = new THREE.Mesh(roadGeometry, roadMaterial);
+			road.rotation.x = -Math.PI / 2;
+			scene.add(road);
+
+			// Player Car
+			const createCar = (color, xPosition) => {
+				const car = new THREE.Group();
+				const bodyGeometry = new THREE.BoxGeometry(2, 0.5, 4);
+				const bodyMaterial = new THREE.MeshLambertMaterial({
+					color: color,
+				});
+				const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+				body.position.y = 0.25;
+
+				const wheelGeometry = new THREE.CylinderGeometry(
+					0.3,
+					0.3,
+					0.2,
+					16
+				);
+				const wheelMaterial = new THREE.MeshLambertMaterial({
+					color: 0x333333,
+				});
+
+				const createWheel = (x, z) => {
+					const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+					wheel.position.set(x, -0.1, z);
+					wheel.rotation.x = Math.PI / 2;
+					return wheel;
+				};
+
+				car.add(body);
+				car.add(createWheel(-0.9, 1.2));
+				car.add(createWheel(0.9, 1.2));
+				car.add(createWheel(-0.9, -1.2));
+				car.add(createWheel(0.9, -1.2));
+
+				car.position.x = xPosition;
+				return car;
+			};
+
+			const playerCar = createCar(0xff0000, -2.5);
+			scene.add(playerCar);
+
+			const opponentCar = createCar(0x0000ff, 2.5);
+			scene.add(opponentCar);
+
+			// Position camera
+			camera.position.set(0, 5, 10);
+			camera.lookAt(0, 0, 0);
+
+			// Game State
+			const gameState = {
+				started: false,
+				finished: false,
+				playerSpeed: 0,
+				opponentSpeed: 0,
+				acceleration: 0.005,
+				drag: 0.001,
+				maxSpeed: 0.1,
+				raceLength: 200,
+				message: document.getElementById("overlay"),
+			};
+
+			// Keyboard controls
+			const keys = {};
+			document.addEventListener("keydown", (event) => {
+				keys[event.key] = true;
+				if (event.key === " " && !gameState.started) {
+					startGame();
+				}
+			});
+			document.addEventListener("keyup", (event) => {
+				keys[event.key] = false;
+			});
+
+			// Start game function
+			function startGame() {
+				if (!gameState.started) {
+					gameState.started = true;
+					gameState.finished = false;
+					gameState.message.style.display = "none";
+					playerCar.position.z = 0;
+					opponentCar.position.z = 0;
+					gameState.playerSpeed = 0;
+					gameState.opponentSpeed = 0;
+					document.getElementById("instructions").style.display =
+						"none";
+				}
+			}
+
+			// Game loop
+			function animate() {
+				requestAnimationFrame(animate);
+
+				if (gameState.started && !gameState.finished) {
+					// Player movement
+					if (keys["w"] || keys["W"] || keys["ArrowUp"]) {
+						gameState.playerSpeed += gameState.acceleration;
+					} else {
+						gameState.playerSpeed -= gameState.drag;
+					}
+					if (keys["s"] || keys["S"] || keys["ArrowDown"]) {
+						gameState.playerSpeed -= gameState.acceleration * 1.5;
+					}
+					gameState.playerSpeed = Math.max(
+						0,
+						Math.min(gameState.maxSpeed, gameState.playerSpeed)
+					);
+					playerCar.position.z -= gameState.playerSpeed;
+
+					// Opponent AI
+					if (Math.random() > 0.5) {
+						gameState.opponentSpeed +=
+							gameState.acceleration *
+							(0.9 + Math.random() * 0.2);
+					} else {
+						gameState.opponentSpeed -= gameState.drag;
+					}
+					gameState.opponentSpeed = Math.max(
+						0,
+						Math.min(gameState.maxSpeed, gameState.opponentSpeed)
+					);
+					opponentCar.position.z -= gameState.opponentSpeed;
+
+					// Check for race end
+					if (
+						playerCar.position.z < -gameState.raceLength ||
+						opponentCar.position.z < -gameState.raceLength
+					) {
+						endGame();
+					}
+				}
+
+				// Camera follow
+				camera.position.z = playerCar.position.z + 10;
+
+				// Repeat road texture
+				roadMaterial.map.offset.y = playerCar.position.z / 10;
+
+				renderer.render(scene, camera);
+			}
+
+			function endGame() {
+				gameState.finished = true;
+				gameState.started = false;
+				let winner = "";
+				if (playerCar.position.z < opponentCar.position.z) {
+					winner = "You Win!";
+				} else if (opponentCar.position.z < playerCar.position.z) {
+					winner = "Opponent Wins!";
+				} else {
+					winner = "It's a Tie!";
+				}
+				gameState.message.textContent = `${winner} - Press SPACE to restart`;
+				gameState.message.style.display = "block";
+				document.getElementById("instructions").style.display = "block";
+			}
+
+			animate();
+		</script>
+	</body>
+</html>
