@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>3D Metroid-style Platformer (Cooler)</title>
+		<title>3D Metroid-style Platformer (Solid Ground)</title>
 		<style>
 			body {
 				margin: 0;
@@ -46,8 +46,8 @@
 	</head>
 	<body>
 		<div id="info">
-			Use A/D to move, Space to jump, mouse-look, and mouse-click to
-			shoot.
+			Use A/D to move, Space to jump, hold F to fly, mouse-look, and
+			mouse-click to shoot.
 		</div>
 		<div id="health-bar">Health: <span id="health-value">100</span></div>
 		<div id="game-over">GAME OVER</div>
@@ -80,13 +80,13 @@
 			let isGameOver = false;
 
 			// Player
-			const playerGeometry = new THREE.BoxGeometry(1, 1.5, 1);
+			const playerHeight = 1.5;
+			const playerGeometry = new THREE.BoxGeometry(1, playerHeight, 1);
 			const playerMaterial = new THREE.MeshLambertMaterial({
 				color: 0x87ceeb,
 			});
 			const player = new THREE.Mesh(playerGeometry, playerMaterial);
-			// Set the player's initial position on the first platform
-			player.position.set(-10, 0.75, 5);
+			player.position.set(-10, playerHeight / 2, 5);
 			player.userData = {
 				velocity: new THREE.Vector3(0, 0, 0),
 				isGrounded: false,
@@ -130,7 +130,7 @@
 				return platform;
 			}
 
-			createPlatform(15, 0, 5, 30, 10); // Main floor
+			const ground = createPlatform(15, 0, 5, 30, 10); // Main floor
 			createPlatform(5, 3, 5, 5, 5); // Raised platform 1
 			createPlatform(25, 3, 5, 5, 5); // Raised platform 2
 
@@ -138,11 +138,16 @@
 			const gravity = -0.05;
 			const jumpStrength = 0.5;
 			const playerSpeed = 0.1;
+			const flySpeed = 0.2;
 			const bulletSpeed = 0.5;
 			const bullets = [];
 			const particles = [];
 			const healthBarElement = document.getElementById("health-value");
 			const gameOverElement = document.getElementById("game-over");
+
+			// Raycaster for ground detection
+			const raycaster = new THREE.Raycaster();
+			const down = new THREE.Vector3(0, -1, 0);
 
 			// Camera follow & look - Initial setup
 			camera.position.set(
@@ -154,11 +159,18 @@
 
 			// Controls
 			const keys = {};
+			let isFlying = false;
 			window.addEventListener("keydown", (e) => {
 				keys[e.key] = true;
+				if (e.key === "f") {
+					isFlying = true;
+				}
 			});
 			window.addEventListener("keyup", (e) => {
 				keys[e.key] = false;
+				if (e.key === "f") {
+					isFlying = false;
+				}
 			});
 			window.addEventListener("mousedown", (e) => {
 				if (e.button === 0 && !isGameOver) {
@@ -257,32 +269,36 @@
 				else if (keys["d"]) player.userData.velocity.x = playerSpeed;
 				else player.userData.velocity.x = 0;
 
-				if (keys[" "] && player.userData.isGrounded) {
-					player.userData.velocity.y = jumpStrength;
+				// Fly logic
+				if (isFlying) {
+					player.userData.velocity.y = flySpeed;
 					player.userData.isGrounded = false;
+				} else {
+					if (keys[" "] && player.userData.isGrounded) {
+						player.userData.velocity.y = jumpStrength;
+						player.userData.isGrounded = false;
+					}
+					player.userData.velocity.y += gravity;
 				}
 
-				// Gravity
-				player.userData.velocity.y += gravity;
+				// Raycaster for ground check
+				raycaster.set(player.position, down);
+				const intersects = raycaster.intersectObjects(platforms);
 
-				// Update player position
-				player.position.add(player.userData.velocity);
-
-				// Ground collision
 				player.userData.isGrounded = false;
-				platforms.forEach((platform) => {
-					if (
-						player.position.y <= platform.position.y + 0.75 &&
-						Math.abs(player.position.x - platform.position.x) <
-							platform.geometry.parameters.width / 2 &&
-						Math.abs(player.position.z - platform.position.z) <
-							platform.geometry.parameters.depth / 2
-					) {
-						player.position.y = platform.position.y + 0.75;
-						player.userData.velocity.y = 0;
-						player.userData.isGrounded = true;
+				if (intersects.length > 0) {
+					const distanceToGround = intersects[0].distance;
+					if (distanceToGround <= playerHeight / 2) {
+						if (player.userData.velocity.y < 0) {
+							player.userData.velocity.y = 0;
+							player.position.y =
+								intersects[0].point.y + playerHeight / 2;
+							player.userData.isGrounded = true;
+						}
 					}
-				});
+				}
+
+				player.position.add(player.userData.velocity);
 
 				// Enemy behavior
 				enemies.forEach((enemy) => {
