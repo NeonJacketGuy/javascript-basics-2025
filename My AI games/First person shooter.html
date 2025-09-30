@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Mini FPS</title>
+		<style>
+			html,
+			body {
+				margin: 0;
+				height: 100%;
+				overflow: hidden;
+				background: #111;
+			}
+			canvas {
+				display: block;
+			}
+			#hud {
+				position: absolute;
+				top: 10px;
+				left: 10px;
+				color: white;
+				font-family: sans-serif;
+				font-size: 18px;
+				text-shadow: 0 1px 2px black;
+			}
+			#overlay {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: rgba(0, 0, 0, 0.6);
+				color: white;
+				font-family: sans-serif;
+				flex-direction: column;
+			}
+			button {
+				margin-top: 10px;
+				padding: 8px 14px;
+				border: none;
+				background: #28a;
+				color: #fff;
+				font-size: 16px;
+				border-radius: 6px;
+				cursor: pointer;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="hud">Score: <span id="score">0</span></div>
+		<div id="overlay">
+			<h1>Mini FPS</h1>
+			<p>
+				Click Start, then use WASD + mouse to move and look.<br />Left-click
+				to shoot cubes!
+			</p>
+			<button id="startBtn">Start</button>
+		</div>
+
+		<script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+		<script src="https://unpkg.com/three@0.157.0/examples/js/controls/PointerLockControls.js"></script>
+		<script>
+			const scene = new THREE.Scene();
+			scene.background = new THREE.Color(0x88ccee);
+			const camera = new THREE.PerspectiveCamera(
+				75,
+				innerWidth / innerHeight,
+				0.1,
+				1000
+			);
+			const renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setSize(innerWidth, innerHeight);
+			document.body.appendChild(renderer.domElement);
+
+			window.addEventListener("resize", () => {
+				camera.aspect = innerWidth / innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize(innerWidth, innerHeight);
+			});
+
+			// Lights
+			scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.7));
+			const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+			dir.position.set(10, 20, 10);
+			scene.add(dir);
+
+			// Floor
+			const floorGeo = new THREE.PlaneGeometry(200, 200);
+			const floorMat = new THREE.MeshStandardMaterial({
+				color: 0x228822,
+			});
+			const floor = new THREE.Mesh(floorGeo, floorMat);
+			floor.rotation.x = -Math.PI / 2;
+			scene.add(floor);
+
+			// PointerLock controls
+			const controls = new THREE.PointerLockControls(
+				camera,
+				document.body
+			);
+			camera.position.set(0, 2, 5);
+
+			// Player move
+			const keys = {};
+			document.addEventListener("keydown", (e) => {
+				keys[e.code] = true;
+			});
+			document.addEventListener("keyup", (e) => {
+				keys[e.code] = false;
+			});
+
+			// Bullets
+			const bullets = [];
+			const bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+			const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+
+			// Enemies
+			const enemies = [];
+			const enemyGeo = new THREE.BoxGeometry(1, 1, 1);
+			const enemyMat = new THREE.MeshStandardMaterial({
+				color: 0xcc2222,
+			});
+
+			function spawnEnemy() {
+				const e = new THREE.Mesh(enemyGeo, enemyMat);
+				const angle = Math.random() * Math.PI * 2;
+				const dist = 15 + Math.random() * 15;
+				e.position.set(
+					Math.cos(angle) * dist,
+					1,
+					Math.sin(angle) * dist
+				);
+				scene.add(e);
+				enemies.push(e);
+			}
+
+			let score = 0;
+			const scoreEl = document.getElementById("score");
+			function addScore(n) {
+				score += n;
+				scoreEl.textContent = score;
+			}
+
+			// Overlay + start
+			const overlay = document.getElementById("overlay");
+			const startBtn = document.getElementById("startBtn");
+			startBtn.onclick = () => {
+				overlay.style.display = "none";
+				controls.lock();
+				resetGame();
+			};
+
+			// Shooting
+			document.addEventListener("click", () => {
+				if (!controls.isLocked) return;
+				const b = new THREE.Mesh(bulletGeo, bulletMat);
+				b.position.copy(camera.position);
+				const dir = new THREE.Vector3();
+				camera.getWorldDirection(dir);
+				b.userData.vel = dir.multiplyScalar(40);
+				scene.add(b);
+				bullets.push(b);
+			});
+
+			function resetGame() {
+				// clear enemies/bullets
+				enemies.forEach((e) => scene.remove(e));
+				enemies.length = 0;
+				bullets.forEach((b) => scene.remove(b));
+				bullets.length = 0;
+				score = 0;
+				addScore(0);
+				for (let i = 0; i < 8; i++) spawnEnemy();
+			}
+
+			let lastTime = performance.now() / 1000;
+			function animate() {
+				requestAnimationFrame(animate);
+				const t = performance.now() / 1000;
+				const dt = Math.min(0.033, t - lastTime);
+				lastTime = t;
+
+				if (controls.isLocked) {
+					// Movement
+					const vel = new THREE.Vector3();
+					if (keys["KeyW"]) vel.z -= 1;
+					if (keys["KeyS"]) vel.z += 1;
+					if (keys["KeyA"]) vel.x -= 1;
+					if (keys["KeyD"]) vel.x += 1;
+					vel.normalize()
+						.applyEuler(camera.rotation)
+						.multiplyScalar(10 * dt);
+					controls.getObject().position.add(vel);
+
+					// Bullets
+					for (let i = bullets.length - 1; i >= 0; i--) {
+						const b = bullets[i];
+						b.position.addScaledVector(b.userData.vel, dt);
+						if (b.position.length() > 200) {
+							scene.remove(b);
+							bullets.splice(i, 1);
+						}
+					}
+
+					// Enemies follow player
+					for (const e of enemies) {
+						const dir = new THREE.Vector3().subVectors(
+							controls.getObject().position,
+							e.position
+						);
+						if (dir.length() > 0.1)
+							e.position.addScaledVector(dir.normalize(), 2 * dt);
+					}
+
+					// Bullet-enemy collisions
+					for (let i = enemies.length - 1; i >= 0; i--) {
+						const e = enemies[i];
+						for (let j = bullets.length - 1; j >= 0; j--) {
+							const b = bullets[j];
+							if (e.position.distanceTo(b.position) < 1) {
+								scene.remove(e);
+								enemies.splice(i, 1);
+								scene.remove(b);
+								bullets.splice(j, 1);
+								addScore(1);
+								spawnEnemy();
+								break;
+							}
+						}
+					}
+
+					// Enemy-player collisions = game over
+					for (const e of enemies) {
+						if (
+							e.position.distanceTo(
+								controls.getObject().position
+							) < 1.5
+						) {
+							controls.unlock();
+							overlay.style.display = "flex";
+							overlay.querySelector("h1").textContent =
+								"Game Over!";
+							startBtn.textContent = "Restart";
+						}
+					}
+				}
+
+				renderer.render(scene, camera);
+			}
+			animate();
+		</script>
+	</body>
+</html>

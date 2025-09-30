@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Endless Runner 3D</title>
+		<style>
+			html,
+			body {
+				margin: 0;
+				height: 100%;
+				overflow: hidden;
+				background: #111;
+			}
+			canvas {
+				display: block;
+			}
+			#hud {
+				position: absolute;
+				top: 10px;
+				left: 10px;
+				color: white;
+				font-family: sans-serif;
+				font-size: 18px;
+				text-shadow: 0 1px 2px black;
+			}
+			#overlay {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: rgba(0, 0, 0, 0.5);
+				color: white;
+				font-family: sans-serif;
+				flex-direction: column;
+			}
+			button {
+				margin-top: 10px;
+				padding: 8px 14px;
+				border: none;
+				background: #28a;
+				color: #fff;
+				font-size: 16px;
+				border-radius: 6px;
+				cursor: pointer;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="hud">Score: <span id="score">0</span></div>
+		<div id="overlay">
+			<h1>Endless Runner 3D</h1>
+			<p>
+				Press Start and use Arrow keys or WASD<br />(← → to switch
+				lanes, ↑ to jump)
+			</p>
+			<button id="startBtn">Start</button>
+		</div>
+
+		<script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+		<script>
+			const scene = new THREE.Scene();
+			scene.background = new THREE.Color(0x87ceeb);
+			const camera = new THREE.PerspectiveCamera(
+				60,
+				innerWidth / innerHeight,
+				0.1,
+				1000
+			);
+			const renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setSize(innerWidth, innerHeight);
+			document.body.appendChild(renderer.domElement);
+
+			window.addEventListener("resize", () => {
+				camera.aspect = innerWidth / innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize(innerWidth, innerHeight);
+			});
+
+			// Lights
+			const light = new THREE.DirectionalLight(0xffffff, 1);
+			light.position.set(5, 10, 5);
+			scene.add(light);
+			scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+			// Ground (long strip that scrolls)
+			const groundGeo = new THREE.PlaneGeometry(20, 200);
+			const groundMat = new THREE.MeshStandardMaterial({
+				color: 0x228822,
+			});
+			const ground = new THREE.Mesh(groundGeo, groundMat);
+			ground.rotation.x = -Math.PI / 2;
+			ground.position.z = -90;
+			scene.add(ground);
+
+			// Player (cube)
+			const playerGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+			const playerMat = new THREE.MeshStandardMaterial({
+				color: 0x1644ff,
+			});
+			const player = new THREE.Mesh(playerGeo, playerMat);
+			player.position.set(0, 1, 5);
+			scene.add(player);
+
+			// State
+			let running = false;
+			let speed = 12;
+			let score = 0;
+			let yVel = 0;
+			const GRAVITY = -30;
+			const LANES = [-4, 0, 4];
+			let currentLane = 1; // index in LANES
+
+			const scoreEl = document.getElementById("score");
+			const overlay = document.getElementById("overlay");
+			const startBtn = document.getElementById("startBtn");
+
+			// Obstacles & Coins
+			const obstacles = [];
+			const coins = [];
+			const obsGeo = new THREE.BoxGeometry(2, 2, 2);
+			const obsMat = new THREE.MeshStandardMaterial({ color: 0xcc2222 });
+			const coinGeo = new THREE.SphereGeometry(0.7, 16, 16);
+			const coinMat = new THREE.MeshStandardMaterial({
+				color: 0xffd54f,
+				emissive: 0x553300,
+			});
+
+			function spawnRow(zPos) {
+				// maybe spawn obstacle or coin in lanes
+				for (let i = 0; i < 3; i++) {
+					const r = Math.random();
+					if (r < 0.2) {
+						// obstacle
+						const m = new THREE.Mesh(obsGeo, obsMat);
+						m.position.set(LANES[i], 1, zPos);
+						scene.add(m);
+						obstacles.push(m);
+					} else if (r < 0.35) {
+						// coin
+						const m = new THREE.Mesh(coinGeo, coinMat);
+						m.position.set(LANES[i], 1, zPos);
+						scene.add(m);
+						coins.push(m);
+					}
+				}
+			}
+
+			function resetGame() {
+				obstacles.forEach((o) => scene.remove(o));
+				obstacles.length = 0;
+				coins.forEach((c) => scene.remove(c));
+				coins.length = 0;
+				score = 0;
+				scoreEl.textContent = score;
+				player.position.set(0, 1, 5);
+				currentLane = 1;
+				yVel = 0;
+				speed = 12;
+				for (let z = 20; z > -200; z -= 10) spawnRow(z);
+			}
+
+			function startGame() {
+				resetGame();
+				running = true;
+				overlay.style.display = "none";
+				lastTime = performance.now() / 1000;
+			}
+
+			startBtn.addEventListener("click", startGame);
+
+			// Input
+			window.addEventListener("keydown", (e) => {
+				if (!running) return;
+				if (e.code === "ArrowLeft" || e.code === "KeyA") {
+					if (currentLane > 0) currentLane--;
+				}
+				if (e.code === "ArrowRight" || e.code === "KeyD") {
+					if (currentLane < 2) currentLane++;
+				}
+				if (
+					(e.code === "ArrowUp" ||
+						e.code === "KeyW" ||
+						e.code === "Space") &&
+					player.position.y <= 1.01
+				) {
+					yVel = 12;
+				}
+			});
+
+			// Game loop
+			let lastTime = performance.now() / 1000;
+			function animate() {
+				requestAnimationFrame(animate);
+				const t = performance.now() / 1000;
+				const dt = Math.min(0.033, t - lastTime);
+				lastTime = t;
+
+				if (running) {
+					// Scroll ground
+					ground.position.z += speed * dt;
+					if (ground.position.z > 0) ground.position.z = -90;
+
+					// Move player toward chosen lane smoothly
+					const targetX = LANES[currentLane];
+					player.position.x = THREE.MathUtils.damp(
+						player.position.x,
+						targetX,
+						8,
+						dt
+					);
+
+					// Gravity + jump
+					yVel += GRAVITY * dt;
+					player.position.y += yVel * dt;
+					if (player.position.y < 1) {
+						player.position.y = 1;
+						yVel = 0;
+					}
+
+					// Move obstacles & coins
+					obstacles.forEach((o) => (o.position.z += speed * dt));
+					coins.forEach((c) => (c.position.z += speed * dt));
+
+					// Remove passed
+					for (let i = obstacles.length - 1; i >= 0; i--) {
+						if (obstacles[i].position.z > 20) {
+							scene.remove(obstacles[i]);
+							obstacles.splice(i, 1);
+						}
+					}
+					for (let i = coins.length - 1; i >= 0; i--) {
+						if (coins[i].position.z > 20) {
+							scene.remove(coins[i]);
+							coins.splice(i, 1);
+						}
+					}
+
+					// Spawn new row occasionally
+					if (Math.random() < 0.02) spawnRow(-200);
+
+					// Collisions
+					for (const o of obstacles) {
+						if (
+							Math.abs(o.position.z - player.position.z) < 1.5 &&
+							Math.abs(o.position.x - player.position.x) < 1.5 &&
+							Math.abs(o.position.y - player.position.y) < 1.5
+						) {
+							running = false;
+							overlay.style.display = "flex";
+							overlay.querySelector("h1").textContent =
+								"Game Over!";
+							startBtn.textContent = "Restart";
+						}
+					}
+					for (let i = coins.length - 1; i >= 0; i--) {
+						const c = coins[i];
+						if (
+							Math.abs(c.position.z - player.position.z) < 1.5 &&
+							Math.abs(c.position.x - player.position.x) < 1.5 &&
+							Math.abs(c.position.y - player.position.y) < 1.5
+						) {
+							score++;
+							scoreEl.textContent = score;
+							scene.remove(c);
+							coins.splice(i, 1);
+						}
+					}
+
+					// Speed up slowly
+					speed += 0.005;
+				}
+
+				// Camera follow
+				camera.position.set(
+					player.position.x,
+					6,
+					player.position.z + 12
+				);
+				camera.lookAt(
+					player.position.x,
+					player.position.y,
+					player.position.z
+				);
+
+				renderer.render(scene, camera);
+			}
+			animate();
+		</script>
+	</body>
+</html>
