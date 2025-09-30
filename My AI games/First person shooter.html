@@ -93,14 +93,14 @@
 			floor.rotation.x = -Math.PI / 2;
 			scene.add(floor);
 
-			// PointerLock controls
+			// Controls
 			const controls = new THREE.PointerLockControls(
 				camera,
 				document.body
 			);
 			camera.position.set(0, 2, 5);
 
-			// Player move
+			// Movement
 			const keys = {};
 			document.addEventListener("keydown", (e) => {
 				keys[e.code] = true;
@@ -134,43 +134,58 @@
 				enemies.push(e);
 			}
 
+			// Score
 			let score = 0;
 			const scoreEl = document.getElementById("score");
-			function addScore(n) {
-				score += n;
+			function setScore(n) {
+				score = n;
 				scoreEl.textContent = score;
 			}
 
 			// Overlay + start
 			const overlay = document.getElementById("overlay");
 			const startBtn = document.getElementById("startBtn");
+
 			startBtn.onclick = () => {
-				overlay.style.display = "none";
-				controls.lock();
-				resetGame();
+				controls.lock(); // request pointer lock
 			};
 
+			// When pointer lock is gained → start/reset game
+			controls.addEventListener("lock", () => {
+				overlay.style.display = "none";
+				resetGame();
+			});
+
+			// When pointer lock is lost → show overlay again
+			controls.addEventListener("unlock", () => {
+				overlay.style.display = "flex";
+				overlay.querySelector("h1").textContent = "Game Over!";
+				startBtn.textContent = "Restart";
+			});
+
 			// Shooting
-			document.addEventListener("click", () => {
+			document.addEventListener("mousedown", (e) => {
 				if (!controls.isLocked) return;
-				const b = new THREE.Mesh(bulletGeo, bulletMat);
-				b.position.copy(camera.position);
-				const dir = new THREE.Vector3();
-				camera.getWorldDirection(dir);
-				b.userData.vel = dir.multiplyScalar(40);
-				scene.add(b);
-				bullets.push(b);
+				if (e.button === 0) {
+					// left click
+					const b = new THREE.Mesh(bulletGeo, bulletMat);
+					b.position.copy(camera.position);
+					const dir = new THREE.Vector3();
+					camera.getWorldDirection(dir);
+					b.userData.vel = dir.multiplyScalar(40);
+					scene.add(b);
+					bullets.push(b);
+				}
 			});
 
 			function resetGame() {
-				// clear enemies/bullets
 				enemies.forEach((e) => scene.remove(e));
 				enemies.length = 0;
 				bullets.forEach((b) => scene.remove(b));
 				bullets.length = 0;
-				score = 0;
-				addScore(0);
+				setScore(0);
 				for (let i = 0; i < 8; i++) spawnEnemy();
+				controls.getObject().position.set(0, 2, 5);
 			}
 
 			let lastTime = performance.now() / 1000;
@@ -222,25 +237,21 @@
 								enemies.splice(i, 1);
 								scene.remove(b);
 								bullets.splice(j, 1);
-								addScore(1);
+								setScore(score + 1);
 								spawnEnemy();
 								break;
 							}
 						}
 					}
 
-					// Enemy-player collisions = game over
+					// Enemy-player collisions
 					for (const e of enemies) {
 						if (
 							e.position.distanceTo(
 								controls.getObject().position
 							) < 1.5
 						) {
-							controls.unlock();
-							overlay.style.display = "flex";
-							overlay.querySelector("h1").textContent =
-								"Game Over!";
-							startBtn.textContent = "Restart";
+							controls.unlock(); // triggers game over overlay
 						}
 					}
 				}
