@@ -290,9 +290,9 @@
 				// Simple driving state
 				let velocity = 0; // forward speed (units/s)
 				let steering = 0; // radians
-				const maxSpeed = 70; // km/h equivalent scaled (game units)
+				const maxSpeed = 90000; // km/h equivalent scaled (game units) -- MODIFIED
 				const maxVel = 22; // world units per second
-				const accel = 18; // acceleration units
+				const accel = 100; // acceleration units
 				const brake = 40;
 				const steerSpeed = 1.9; // steering responsiveness
 
@@ -306,263 +306,236 @@
 					keys[e.key.toLowerCase()] = false;
 				});
 
-				// Timing
-				let lastTime = performance.now();
-				let startTime = performance.now();
+				// Car state & game state
 				let lap = 0;
-				let cpIndex = 0;
-				let best = null;
+				let currentCp = 0;
+				let time = 0;
+				let gameStarted = false;
+				let lastTimestamp = 0;
 
-				cpEl.textContent = cpIndex;
-
-				// Camera follow smoothing
-				function updateCamera() {
-					const desired = new THREE.Vector3();
-					// camera follows behind and slightly above
-					desired.copy(car.position);
-					const back = new THREE.Vector3(0, 2, -8).applyQuaternion(
-						car.quaternion
-					);
-					desired.add(back);
-					// LERP camera to desired
-					camera.position.lerp(desired, 0.12);
-					// Look at car
-					const lookAt = new THREE.Vector3()
-						.copy(car.position)
-						.add(new THREE.Vector3(0, 1.2, 0));
-					camera.lookAt(lookAt);
-				}
-
-				// Simple collision detection with cones (sphere vs cylinder approximation)
-				function handleCollisions(delta) {
-					for (const o of obstacles) {
-						const d = o.position.distanceTo(car.position);
-						if (d < 2.2) {
-							// simple bounce and slow down
-							velocity *= -0.35;
-							// push car away
-							const push = car.position
-								.clone()
-								.sub(o.position)
-								.normalize()
-								.multiplyScalar(1.4);
-							car.position.add(push);
-							flashMessage("Oof! Hit a cone.", 700);
-						}
-					}
-				}
-
-				function flashMessage(text, ms = 1200) {
-					messageEl.textContent = text;
-					messageEl.style.display = "block";
-					clearTimeout(messageEl._timeout);
-					messageEl._timeout = setTimeout(
-						() => (messageEl.style.display = "none"),
-						ms
-					);
-				}
-
-				// Track/checkpoint detection
-				function checkCheckpoints() {
-					const cp = checkpoints[cpIndex];
-					const d = cp.position.distanceTo(car.position);
-					if (d < 8.0) {
-						cpIndex = (cpIndex + 1) % checkpoints.length;
-						cpEl.textContent = cpIndex;
-						// if we've looped back to zero, got a lap
-						if (cpIndex === 0) {
-							lap++;
-							const lapTime =
-								(performance.now() - startTime) / 1000;
-							startTime = performance.now();
-							flashMessage(
-								`Lap ${lap} done! ${lapTime.toFixed(2)}s`,
-								1400
-							);
-							if (best === null || lapTime < best) best = lapTime;
-						}
-					}
-				}
-
-				// Reset car to start
 				function resetCar() {
+					velocity = 0;
 					car.position.set(trackPoints[0].x, 0, trackPoints[0].z);
 					car.rotation.y =
 						Math.atan2(
 							trackPoints[1].x - trackPoints[0].x,
 							trackPoints[1].z - trackPoints[0].z
 						) + Math.PI;
-					velocity = 0;
-					steering = 0;
-					flashMessage("Reset");
+					currentCp = 0;
+					lap = 0;
+					time = 0;
+					gameStarted = false;
+					showMessage("Game Reset", 1.5);
+					cpEl.textContent = 0;
+					lapEl.textContent = `Lap: 0 / 3`;
+					timeEl.textContent = `0.00`;
 				}
 
-				// Minimap drawing
-				const mm = document.getElementById("mm");
-				const mmCtx = mm.getContext("2d");
+				// Collision detection (simple distance check with cones)
+				function checkCollisions() {
+					for (const cone of obstacles) {
+						if (car.position.distanceTo(cone.position) < 2) {
+							// Push car away from cone
+							const dir = car.position
+								.clone()
+								.sub(cone.position)
+								.normalize();
+							car.position.add(dir.multiplyScalar(0.01));
+							// Slow down car
+							velocity *= 0.96;
+						}
+					}
+				}
+
+				// Checkpoint detection (simple distance check with rings)
+				function checkCheckpoints() {
+					const nextCp = checkpoints[currentCp];
+					if (car.position.distanceTo(nextCp.position) < 6) {
+						if (currentCp === checkpoints.length - 1) {
+							// Last checkpoint, start new lap
+							lap++;
+							currentCp = 0;
+							showMessage(
+								`Lap ${lap} of 3 completed!`,
+								2,
+								"green"
+							);
+							if (lap === 3) {
+								showMessage(
+									"Race Finished! Time: " +
+										time.toFixed(2) +
+										"s",
+									999,
+									"gold"
+								);
+								gameStarted = false;
+							}
+						} else {
+							currentCp++;
+							showMessage(
+								`Checkpoint ${currentCp} of ${checkpoints.length} reached!`,
+								1
+							);
+						}
+						cpEl.textContent = currentCp;
+						lapEl.textContent = `Lap: ${lap} / 3`;
+					}
+				}
+
+				function showMessage(text, duration, color) {
+					messageEl.style.display = "block";
+					messageEl.style.color = color || "white";
+					messageEl.textContent = text;
+					clearTimeout(messageEl.timer);
+					if (duration !== 999) {
+						messageEl.timer = setTimeout(() => {
+							messageEl.style.display = "none";
+						}, duration * 1000);
+					}
+				}
+
+				// Minimap (Canvas)
+				const mmCanvas = document.getElementById("mm");
+				const mmCtx = mmCanvas.getContext("2d");
+				const mmScale = 1.5; // Adjusted scale for a clearer minimap
+
 				function drawMinimap() {
-					mmCtx.clearRect(0, 0, mm.width, mm.height);
-					mmCtx.fillStyle = "#071016";
-					mmCtx.fillRect(0, 0, mm.width, mm.height);
-					// transform world coordinates into minimap
-					const scale = 1.6;
-					const centerX = mm.width / 2,
-						centerY = mm.height / 2;
-					mmCtx.strokeStyle = "#5b8c5b";
-					mmCtx.lineWidth = 2;
-					mmCtx.beginPath();
-					mmCtx.moveTo(
-						centerX + trackPoints[0].x / scale,
-						centerY + trackPoints[0].z / scale
+					mmCtx.clearRect(0, 0, mmCanvas.width, mmCanvas.height);
+					mmCtx.save();
+					mmCtx.translate(
+						mmCanvas.width / 2,
+						mmCanvas.height / 2 + 10
 					);
-					for (const p of trackPoints) {
-						mmCtx.lineTo(
-							centerX + p.x / scale,
-							centerY + p.z / scale
-						);
+					mmCtx.scale(mmScale, mmScale);
+
+					// Draw track
+					mmCtx.strokeStyle = "#ffffaa";
+					mmCtx.lineWidth = 1;
+					mmCtx.beginPath();
+					for (let i = 0; i < trackPoints.length; i++) {
+						const p = trackPoints[i];
+						if (i === 0) {
+							mmCtx.moveTo(p.x, p.z);
+						} else {
+							mmCtx.lineTo(p.x, p.z);
+						}
 					}
 					mmCtx.closePath();
 					mmCtx.stroke();
 
-					// draw obstacles
-					mmCtx.fillStyle = "#ff6b3b";
-					for (const o of obstacles) {
-						mmCtx.fillRect(
-							centerX + o.position.x / scale - 2,
-							centerY + o.position.z / scale - 2,
-							4,
-							4
-						);
-					}
-
-					// car
-					mmCtx.fillStyle = "#6fc3ff";
+					// Draw car
+					mmCtx.fillStyle = "white";
 					mmCtx.beginPath();
 					mmCtx.arc(
-						centerX + car.position.x / scale,
-						centerY + car.position.z / scale,
-						4,
+						car.position.x,
+						car.position.z,
+						1.5 / mmScale,
 						0,
 						Math.PI * 2
 					);
 					mmCtx.fill();
+
+					// Draw checkpoints
+					mmCtx.strokeStyle = "#66ccff";
+					mmCtx.lineWidth = 2 / mmScale;
+					checkpoints.forEach((cp, i) => {
+						if (i >= currentCp) {
+							mmCtx.beginPath();
+							mmCtx.arc(
+								cp.position.x,
+								cp.position.z,
+								2.5 / mmScale,
+								0,
+								Math.PI * 2
+							);
+							mmCtx.stroke();
+						}
+					});
+
+					mmCtx.restore();
 				}
 
-				// Main loop
-				function animate(now) {
-					const dt = Math.min((now - lastTime) / 1000, 0.05);
-					lastTime = now;
+				// Main game loop
+				function animate(timestamp) {
+					const delta = (timestamp - lastTimestamp) / 1000;
+					lastTimestamp = timestamp;
 
-					// Controls: forward/back & steering
-					let forward = 0;
-					if (keys["w"] || keys["arrowup"]) forward = 1;
-					if (keys["s"] || keys["arrowdown"]) forward = -1;
-					// braking stronger when pressing S
-					if (forward > 0) velocity += accel * dt;
-					else if (forward < 0) velocity -= brake * dt;
-					else {
-						// natural drag
-						if (velocity > 0) velocity -= 10 * dt;
-						else if (velocity < 0) velocity += 10 * dt;
-					}
+					// Game Logic (only runs if started)
+					if (gameStarted) {
+						// Update time
+						time += delta;
+						timeEl.textContent = time.toFixed(2);
 
-					velocity = Math.max(Math.min(velocity, maxVel), -8);
+						// Car controls
+						if (keys.w || keys.arrowup) velocity += accel * delta;
+						if (keys.s || keys.arrowdown) velocity -= brake * delta;
+						if (keys.a || keys.arrowleft)
+							steering += steerSpeed * delta;
+						if (keys.d || keys.arrowright)
+							steering -= steerSpeed * delta;
 
-					// steering
-					let steerInput = 0;
-					if (keys["a"] || keys["arrowleft"]) steerInput = 1;
-					if (keys["d"] || keys["arrowright"]) steerInput = -1;
-					// steering scaled by speed (can't turn much when stopped)
-					const steerAmount =
-						steerInput *
-						steerSpeed *
-						Math.min(1, Math.abs(velocity) / 8);
-					steering += (steerAmount - steering) * Math.min(1, 6 * dt);
-					// apply rotation based on steering and velocity
-					const turn =
-						steering *
-						(velocity * 0.08) *
-						dt *
-						(velocity >= 0 ? 1 : -1);
-					car.rotation.y += turn;
+						// Limit speed
+						velocity = Math.max(0, Math.min(velocity, maxVel));
 
-					// move car forward in local Z
-					const forwardVec = new THREE.Vector3(0, 0, 1)
-						.applyQuaternion(car.quaternion)
-						.multiplyScalar(velocity * dt);
-					car.position.add(forwardVec);
+						// Update car position based on velocity and steering
+						car.rotation.y +=
+							steering * delta * (velocity / maxVel);
+						car.position.x +=
+							Math.sin(car.rotation.y) * velocity * delta;
+						car.position.z +=
+							Math.cos(car.rotation.y) * velocity * delta;
 
-					// keep car on ground y=0
-					car.position.y = 0;
+						// Dampen steering
+						steering *= 0.92;
+						// Apply braking friction
+						velocity *= 0.98;
 
-					// small tilt when steering
-					body.rotation.z = steering * 0.45;
-
-					// wheel rotation visual
-					const wheelSpin = velocity * dt * 6;
-					for (const w of [w1, w2, w3, w4]) w.rotation.x += wheelSpin;
-
-					// collisions
-					handleCollisions(dt);
-
-					// checkpoints/laps
-					checkCheckpoints();
-
-					// update HUD
-					const kmh = Math.round((velocity / maxVel) * maxSpeed);
-					speedEl.textContent = `Speed: ${kmh} km/h`;
-					lapEl.textContent = `Lap: ${lap} / 3`;
-					const elapsed = (
-						(performance.now() - startTime) /
-						1000
-					).toFixed(2);
-					timeEl.textContent = elapsed;
-
-					// draw minimap and camera
-					drawMinimap();
-					updateCamera();
-
-					renderer.render(scene, camera);
-
-					// end if completed 3 laps
-					if (lap >= 3) {
-						flashMessage(
-							`You finished 3 laps! Best: ${
-								best ? best.toFixed(2) : "—"
-							}s`,
-							4000
-						);
-						// freeze game by not requesting another frame for 2.5s, then reset everything
-						setTimeout(() => {
-							lap = 0;
-							cpIndex = 0;
-							cpEl.textContent = cpIndex;
-							lapEl.textContent = `Lap: ${lap} / 3`;
-							resetCar();
-						}, 2500);
+						// Check for collisions and checkpoints
+						checkCollisions();
+						checkCheckpoints();
 					} else {
-						requestAnimationFrame(animate);
+						if (
+							keys.w ||
+							keys.s ||
+							keys.arrowup ||
+							keys.arrowdown
+						) {
+							gameStarted = true;
+							showMessage("Go!", 1.5, "cyan");
+							lastTimestamp = timestamp; // Reset timer for accurate start
+						}
 					}
+
+					// Update camera
+					camera.lookAt(car.position);
+					camera.position.x =
+						car.position.x - 10 * Math.sin(car.rotation.y);
+					camera.position.z =
+						car.position.z - 10 * Math.cos(car.rotation.y);
+					camera.position.y = 6;
+
+					// Render
+					renderer.render(scene, camera);
+					speedEl.textContent = `Speed: ${(
+						(velocity / maxVel) *
+						maxSpeed
+					).toFixed(0)} km/h`; // Display scaled speed
+					drawMinimap();
+
+					requestAnimationFrame(animate);
 				}
 
-				// Handle resizing
+				requestAnimationFrame(animate);
+
+				// Handle window resize
 				window.addEventListener("resize", () => {
 					camera.aspect = window.innerWidth / window.innerHeight;
 					camera.updateProjectionMatrix();
 					renderer.setSize(window.innerWidth, window.innerHeight);
 				});
 
-				// Kick off
-				resetCar();
-				lastTime = performance.now();
-				startTime = performance.now();
-				requestAnimationFrame(animate);
-
-				// Optional: show pointers for toggles
-				flashMessage(
-					"Ready! Drive with W/A/S/D or Arrows — R to reset",
-					2200
-				);
+				// Initial message
+				showMessage("Press W or ↑ to start", 999, "cyan");
 			})();
 		</script>
 	</body>
