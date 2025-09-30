@@ -19,11 +19,12 @@ let currentTimestamp = 0;
 let box = {
 	x: 0,
 	y: 0,
+	speed: 10,
 	xDirection: 1,
 	yDirection: 1,
 	width: 10,
 	draw: function () {
-		CTX.fillStyle = "blue";
+		CTX.fillStyle = "black";
 		CTX.fillRect(this.x, this.y, this.width, this.width);
 	},
 	update: function () {
@@ -33,20 +34,23 @@ let box = {
 		let right = this.x + this.width;
 
 		if (top < 0) {
-			this.yDirection = 5;
+			// colliding with top
+			this.yDirection = 1;
 		} else if (bottom > HEIGHT) {
+			// colliding with bottom
 			this.yDirection = -1;
 		}
 
 		if (left < 0) {
-			this.xDirection = 5;
+			// colliding with left
+			this.xDirection = 1;
 		} else if (right > WIDTH) {
+			// colliding with right
 			this.xDirection = -1;
 		}
 
-
-		this.x += this.xDirection;
-		this.y += this.yDirection;
+		this.x += this.xDirection * this.speed;
+		this.y += this.yDirection * this.speed;
 	},
 };
 
