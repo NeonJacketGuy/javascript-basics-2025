@@ -8,8 +8,8 @@ const CANVAS = document.getElementById("game-canvas");
 //@ts-ignore is not null
 const CTX = CANVAS.getContext("2d");
 
-const HEIGHT = 1500;
-const WIDTH = 2900;
+const HEIGHT = 1400;
+const WIDTH = 2800;
 
 CANVAS.height = HEIGHT;
 CANVAS.width = WIDTH;
@@ -74,15 +74,15 @@ let colors = [
 ];
 CTX.globalAlpha = 0.1;
 
-for (let i = 0; i <= 1000; i++) {
+for (let i = 0; i <= 170000; i++) {
 	let color = colors[Math.floor(Math.random() * colors.length)];
 	let box = new Box(WIDTH / 2, HEIGHT / 2, color);
 	box.width = 10;
 	box.height = 10;
 	box.x = Math.random() * (WIDTH - 100);
 	box.y = Math.random() * (HEIGHT - 100);
-	box.speedX = Math.random() * 1 + 30;
-	box.speedY = Math.random() * 10 + 30;
+	box.speedX = Math.random() * 100000000 + 30000000;
+	box.speedY = Math.random() * 10000000 + 3000000000;
 	boxes.push(box);
 }
 
