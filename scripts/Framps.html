@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>FPS Counter</title>
+		<style>
+			#fpsCounter {
+				position: fixed;
+				top: 10px;
+				left: 10px;
+				background: black;
+				color: lime;
+				font-family: monospace;
+				padding: 5px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="fpsCounter">FPS: 0</div>
+
+		<script>
+			let lastTime = performance.now();
+			let frameCount = 0;
+			let fps = 0;
+
+			const fpsCounter = document.getElementById("fpsCounter");
+
+			function update() {
+				frameCount++;
+				const now = performance.now();
+
+				// Check every second
+				if (now - lastTime >= 1000) {
+					fps = frameCount;
+					frameCount = 0;
+					lastTime = now;
+
+					fpsCounter.textContent = "FPS: " + fps;
+				}
+
+				requestAnimationFrame(update);
+			}
+
+			requestAnimationFrame(update);
+		</script>
+	</body>
+</html>

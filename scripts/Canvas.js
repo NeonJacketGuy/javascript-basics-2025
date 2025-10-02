@@ -20,7 +20,8 @@ class Box {
 		this.y = y;
 		this.color = color;
 
-		this.speed = 10;
+		this.speedX = 10;
+		this.speedY = 10;
 		this.width = 50;
 		this.height = this.width;
 
@@ -58,8 +59,8 @@ class Box {
 			this.xDirection = -1;
 		}
 
-		this.x += this.xDirection * this.speed;
-		this.y += this.yDirection * this.speed;
+		this.x += this.xDirection * this.speedX;
+		this.y += this.yDirection * this.speedY;
 	}
 }
 
@@ -73,14 +74,15 @@ let colors = [
 ];
 CTX.globalAlpha = 0.1;
 
-for (let i = 0; i <= 50000; i++) {
+for (let i = 0; i <= 17000000; i++) {
 	let color = colors[Math.floor(Math.random() * colors.length)];
 	let box = new Box(WIDTH / 2, HEIGHT / 2, color);
-	box.width = 10;
-	box.height = 10;
+	box.width = 100;
+	box.height = 100;
 	box.x = Math.random() * (WIDTH - 100);
 	box.y = Math.random() * (HEIGHT - 100);
-	box.speed = Math.random() * 1 + 3000000000000;
+	box.speedX = Math.random() * 1 + 30;
+	box.speedY = Math.random() * 10 + 30;
 	boxes.push(box);
 }
 
@@ -99,3 +101,4 @@ function drawLoop(timestamp) {
 }
 
 requestAnimationFrame(drawLoop);
+
