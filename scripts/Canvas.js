@@ -74,11 +74,11 @@ let colors = [
 ];
 CTX.globalAlpha = 0.1;
 
-for (let i = 0; i <= 17000000; i++) {
+for (let i = 0; i <= 1000; i++) {
 	let color = colors[Math.floor(Math.random() * colors.length)];
 	let box = new Box(WIDTH / 2, HEIGHT / 2, color);
-	box.width = 100;
-	box.height = 100;
+	box.width = 10;
+	box.height = 10;
 	box.x = Math.random() * (WIDTH - 100);
 	box.y = Math.random() * (HEIGHT - 100);
 	box.speedX = Math.random() * 1 + 30;
@@ -101,4 +101,6 @@ function drawLoop(timestamp) {
 }
 
 requestAnimationFrame(drawLoop);
+
+
 
