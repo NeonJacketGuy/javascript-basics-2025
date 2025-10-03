@@ -5,6 +5,17 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Airplane!</title>
 		<link rel="stylesheet" href="shoot.css" />
+		<style>
+			#fpsCounter {
+				position: fixed;
+				top: 10px;
+				left: 10px;
+				background: black;
+				color: lime;
+				font-family: monospace;
+				padding: 5px;
+			}
+		</style>
 	</head>
 	<body>
 		<div class="marquee-container">
@@ -55,11 +66,37 @@
 				>
 			</div>
 		</div>
+		<div id="fpsCounter">FPS: 0</div>
+
 		<canvas id="gameCanvas"></canvas>
 		<div id="controls">
 			Press the spacebar to jump. Do not die, it will not result in you
 			living.
 		</div>
 		<script src="shoot.js"></script>
+		<script>
+			let lastTime = performance.now();
+			let frameCount = 0;
+			let fps = 0;
+
+			const fpsCounter = document.getElementById("fpsCounter");
+
+			function update() {
+				frameCount++;
+				const now = performance.now();
+
+				if (now - lastTime >= 1000) {
+					fps = frameCount;
+					frameCount = 0;
+					lastTime = now;
+
+					fpsCounter.textContext = "FPS: " + fps;
+				}
+
+				requestAnimationFrame(update);
+			}
+
+			requestAnimationFrame(update);
+		</script>
 	</body>
 </html>

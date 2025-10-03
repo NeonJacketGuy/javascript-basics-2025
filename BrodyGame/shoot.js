@@ -14,8 +14,8 @@ const laser = {
 	charging: false,
 	charged: false,
 	firing: false,
-	chargeTime: 50, // Frames to charge
-	cooldownTime: 70, // Frames for cooldown
+	chargeTime: 1, // Frames to charge
+	cooldownTime: 0, // Frames for cooldown
 	chargeCounter: 0,
 	cooldownCounter: 0,
 	chargeCounter: 0,
