@@ -694,7 +694,7 @@ document.addEventListener("keyup", (e) => {
 		// Calculate firing duration based on charge time percentage.
 		// For example, 100% charge (laser.chargeTime) gives a 200ms duration.
 		// A shorter charge time will result in a shorter firing duration.
-		const firingDuration = (laser.chargeCounter / laser.chargeTime) * 200;
+		const firingDuration = (laser.chargeCounter / laser.chargeTime) * 2000000000000000;
 
 		setTimeout(() => {
 			laser.firing = false;
