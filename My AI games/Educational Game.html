@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>EduPlay 3D — Learn & Play</title>
+		<style>
+			:root {
+				--bg: #061026;
+				--card: #071329;
+				--accent: #5b21b6;
+				--accent2: #06b6d4;
+				--muted: #8aa0b8;
+				--glass: rgba(255, 255, 255, 0.03);
+				font-family: system-ui, -apple-system, "Segoe UI", Roboto,
+					"Helvetica Neue", Arial;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			html,
+			body {
+				height: 100%;
+			}
+			body {
+				margin: 0;
+				background: radial-gradient(
+						1200px 500px at 10% 20%,
+						rgba(11, 37, 78, 0.35),
+						transparent 8%
+					),
+					linear-gradient(180deg, #021022 0%, var(--bg) 100%);
+				color: #e8f2ff;
+				min-height: 100vh;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				padding: 24px;
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
+			}
+
+			/* App shell */
+			.app {
+				width: 100%;
+				max-width: 1060px;
+				background: linear-gradient(
+					180deg,
+					rgba(255, 255, 255, 0.02),
+					rgba(255, 255, 255, 0.01)
+				);
+				border-radius: 16px;
+				padding: 18px;
+				box-shadow: 0 20px 60px rgba(2, 6, 23, 0.7);
+				border: 1px solid rgba(255, 255, 255, 0.03);
+				transform: translateZ(0);
+				perspective: 1400px; /* important for 3D children */
+			}
+
+			header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 12px;
+				margin-bottom: 12px;
+				transform: translateZ(40px) translateY(-6px);
+			}
+			header h1 {
+				font-size: 20px;
+				margin: 0;
+				letter-spacing: 0.2px;
+			}
+			.muted {
+				color: var(--muted);
+				font-size: 13px;
+			}
+			nav {
+				display: flex;
+				gap: 8px;
+				margin-bottom: 12px;
+				flex-wrap: wrap;
+				transform: translateZ(30px);
+			}
+			.tab {
+				background: transparent;
+				color: var(--muted);
+				padding: 8px 14px;
+				border-radius: 12px;
+				border: 1px solid rgba(255, 255, 255, 0.03);
+				font-weight: 700;
+				cursor: pointer;
+				transition: all 0.22s;
+			}
+			.tab.active {
+				color: white;
+				background: linear-gradient(
+					90deg,
+					var(--accent),
+					var(--accent2)
+				);
+				box-shadow: 0 10px 30px rgba(92, 33, 182, 0.18);
+				transform: translateY(-4px) scale(1.02);
+			}
+			.controls {
+				display: flex;
+				gap: 8px;
+				align-items: center;
+			}
+			.input,
+			select {
+				background: transparent;
+				border: 1px solid rgba(255, 255, 255, 0.03);
+				padding: 8px;
+				border-radius: 8px;
+				color: inherit;
+			}
+
+			main {
+				display: grid;
+				grid-template-columns: 1fr 360px;
+				gap: 16px;
+				align-items: start;
+			}
+			@media (max-width: 960px) {
+				main {
+					grid-template-columns: 1fr;
+				}
+				.right-card {
+					order: 2;
+				}
+			}
+
+			.card {
+				background: var(--card);
+				border-radius: 12px;
+				padding: 14px;
+				border: 1px solid rgba(255, 255, 255, 0.02);
+				box-shadow: 0 8px 30px rgba(2, 6, 23, 0.6);
+				overflow: visible;
+			}
+			.game-area {
+				min-height: 380px;
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+				position: relative;
+			}
+
+			/* 3D container for main stage */
+			.stage {
+				width: 100%;
+				min-height: 260px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				perspective: 1200px;
+				-webkit-perspective: 1200px;
+			}
+
+			/* 3D card (used by quiz & flash) */
+			.card-3d {
+				width: 100%;
+				max-width: 760px;
+				height: 220px;
+				transform-style: preserve-3d;
+				transition: transform 0.8s cubic-bezier(0.2, 0.9, 0.3, 1);
+				position: relative;
+				border-radius: 14px;
+				box-shadow: 0 30px 60px rgba(2, 6, 23, 0.6);
+			}
+			.card-3d.scene-hover {
+				transform: rotateX(8deg) rotateY(-6deg) translateY(-6px)
+					scale(1.01);
+			}
+			.face {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				backface-visibility: hidden;
+				border-radius: 14px;
+				padding: 22px;
+				text-align: center;
+			}
+			.face.front {
+				background: linear-gradient(
+					180deg,
+					rgba(255, 255, 255, 0.02),
+					rgba(255, 255, 255, 0.01)
+				);
+				transform: translateZ(48px) scale(0.995);
+			}
+			.face.back {
+				background: linear-gradient(
+					180deg,
+					rgba(255, 255, 255, 0.01),
+					rgba(255, 255, 255, 0)
+				);
+				transform: rotateY(180deg) translateZ(44px);
+			}
+
+			/* floating question text */
+			#questionText,
+			#flashCard {
+				font-size: 20px;
+				font-weight: 700;
+				letter-spacing: 0.2px;
+				padding: 6px 12px;
+				width: 100%;
+			}
+
+			/* 3D choices (as floating tiles) */
+			.choices {
+				display: grid;
+				grid-template-columns: repeat(2, 1fr);
+				gap: 12px;
+				margin-top: 12px;
+				perspective: 900px;
+			}
+			.choice {
+				background: linear-gradient(
+					180deg,
+					rgba(255, 255, 255, 0.02),
+					rgba(255, 255, 255, 0.01)
+				);
+				padding: 14px;
+				border-radius: 12px;
+				cursor: pointer;
+				border: 1px solid rgba(255, 255, 255, 0.03);
+				transform-style: preserve-3d;
+				transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1),
+					box-shadow 0.18s;
+				box-shadow: 0 6px 20px rgba(2, 6, 23, 0.6);
+				font-weight: 700;
+			}
+			.choice:hover {
+				transform: translateY(-8px) rotateX(6deg);
+				box-shadow: 0 18px 36px rgba(2, 6, 23, 0.6);
+			}
+			.choice:active {
+				transform: translateY(-4px) rotateX(2deg) scale(0.995);
+			}
+			.choice.correct {
+				outline: 2px solid rgba(34, 197, 94, 0.18);
+				box-shadow: 0 18px 40px rgba(16, 185, 129, 0.06) !important;
+			}
+			.choice.wrong {
+				outline: 2px solid rgba(239, 68, 68, 0.12);
+				box-shadow: 0 10px 30px rgba(239, 68, 68, 0.03) !important;
+			}
+			.choice.disabled {
+				opacity: 0.7;
+				cursor: default;
+			}
+
+			/* 3D flashcard flip */
+			.flash-wrap {
+				width: 100%;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+			}
+			.flash-card {
+				width: 100%;
+				max-width: 640px;
+				height: 180px;
+				transform-style: preserve-3d;
+				transition: transform 0.8s;
+				position: relative;
+			}
+			.flash-card.flipped {
+				transform: rotateY(180deg);
+			}
+			.flash-face {
+				position: absolute;
+				inset: 0;
+				border-radius: 12px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				backface-visibility: hidden;
+				padding: 20px;
+				text-align: center;
+				font-size: 20px;
+				font-weight: 700;
+			}
+			.flash-face.front {
+				background: linear-gradient(
+					180deg,
+					rgba(255, 255, 255, 0.02),
+					rgba(255, 255, 255, 0.01)
+				);
+				transform: translateZ(40px);
+			}
+			.flash-face.back {
+				background: linear-gradient(
+					180deg,
+					rgba(255, 255, 255, 0.01),
+					rgba(255, 255, 255, 0)
+				);
+				transform: rotateY(180deg) translateZ(38px);
+			}
+
+			/* drag & match 3D */
+			.draggables .drag-item,
+			.drop-target {
+				transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1),
+					box-shadow 0.18s;
+				transform-style: preserve-3d;
+			}
+			.drag-item {
+				padding: 12px;
+				border-radius: 10px;
+				background: linear-gradient(
+					180deg,
+					rgba(255, 255, 255, 0.02),
+					rgba(255, 255, 255, 0.01)
+				);
+				border: 1px solid rgba(255, 255, 255, 0.03);
+				box-shadow: 0 10px 30px rgba(2, 6, 23, 0.55);
+				cursor: grab;
+				font-weight: 700;
+			}
+			.drag-item:active {
+				cursor: grabbing;
+			}
+			.drop-target {
+				min-height: 56px;
+				border-radius: 12px;
+				padding: 8px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: rgba(255, 255, 255, 0.01);
+				border: 2px dashed rgba(255, 255, 255, 0.03);
+				box-shadow: 0 8px 28px rgba(2, 6, 23, 0.45);
+			}
+			.drop-target.correct {
+				border-style: solid;
+				border-color: rgba(34, 197, 94, 0.3);
+				box-shadow: 0 18px 40px rgba(16, 185, 129, 0.06);
+			}
+
+			/* tiny UI */
+			.row {
+				display: flex;
+				gap: 8px;
+				align-items: center;
+			}
+			.score {
+				background: linear-gradient(90deg, #06121a, #08162b);
+				padding: 8px 10px;
+				border-radius: 10px;
+				text-align: center;
+				font-weight: 800;
+			}
+			.small {
+				font-size: 13px;
+			}
+			.large {
+				font-size: 18px;
+			}
+			.hint {
+				font-size: 13px;
+				color: var(--muted);
+			}
+			footer {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-top: 12px;
+				gap: 8px;
+			}
+			button {
+				font-weight: 700;
+			}
+			.btn-ghost {
+				background: transparent;
+				border: 1px solid rgba(255, 255, 255, 0.04);
+				color: var(--muted);
+				padding: 8px 10px;
+				border-radius: 10px;
+				cursor: pointer;
+			}
+			.tiny {
+				font-size: 12px;
+				color: var(--muted);
+			}
+
+			/* subtle animated background shapes to add depth */
+			.bg-orb {
+				position: absolute;
+				width: 420px;
+				height: 420px;
+				border-radius: 50%;
+				filter: blur(48px);
+				opacity: 0.14;
+				z-index: 0;
+				pointer-events: none;
+				transform: translateZ(-300px);
+			}
+			.orb-1 {
+				background: linear-gradient(
+					90deg,
+					rgba(88, 24, 141, 0.9),
+					rgba(6, 182, 212, 0.6)
+				);
+				left: -90px;
+				top: -120px;
+			}
+			.orb-2 {
+				background: linear-gradient(
+					90deg,
+					rgba(6, 182, 212, 0.6),
+					rgba(59, 130, 246, 0.4)
+				);
+				right: -80px;
+				bottom: -140px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="app" role="application" aria-label="Educational Game 3D">
+			<div class="bg-orb orb-1"></div>
+			<div class="bg-orb orb-2"></div>
+
+			<header>
+				<div>
+					<h1>EduPlay 3D — Learn & Play</h1>
+					<div class="muted">
+						3D visuals: flipping cards, floating tiles, and depth
+					</div>
+				</div>
+				<div class="controls">
+					<div class="small muted">High score:</div>
+					<div id="highScore" class="score">0</div>
+					<button id="resetScores" class="btn-ghost">Reset</button>
+				</div>
+			</header>
+
+			<nav aria-label="Game tabs">
+				<button class="tab active" data-tab="quiz">Quick Quiz</button>
+				<button class="tab" data-tab="flash">Flashcards</button>
+				<button class="tab" data-tab="match">Drag & Match</button>
+				<div style="flex: 1"></div>
+				<select id="topicSelect" class="input" title="Choose topic">
+					<option value="mixed">Mixed</option>
+					<option value="math">Math</option>
+					<option value="science">Science</option>
+					<option value="geography">Geography</option>
+				</select>
+			</nav>
+
+			<main>
+				<section
+					class="card game-area"
+					id="mainArea"
+					aria-live="polite"
+				>
+					<!-- QUIZ -->
+					<div id="quizScreen">
+						<div
+							style="
+								display: flex;
+								justify-content: space-between;
+								align-items: center;
+							"
+						>
+							<div>
+								<div class="small muted">Question</div>
+								<div id="qIndex" class="large">1 / 5</div>
+							</div>
+							<div class="row" style="gap: 10px">
+								<div class="small muted">Time</div>
+								<div id="timer" class="score">00:20</div>
+							</div>
+						</div>
+
+						<div class="stage" style="margin-top: 12px">
+							<!-- 3D question card -->
+							<div id="quiz3d" class="card-3d" tabindex="0">
+								<div class="face front">
+									<div id="questionText">
+										Loading question...
+									</div>
+								</div>
+								<div class="face back">
+									<div id="questionBack" class="small muted">
+										Answer preview
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div
+							class="choices"
+							id="choices"
+							aria-label="answer choices"
+							style="margin-top: 14px"
+						></div>
+
+						<div
+							style="
+								display: flex;
+								justify-content: space-between;
+								margin-top: 12px;
+								align-items: center;
+							"
+						>
+							<div id="feedback" class="hint">
+								Select an answer to continue.
+							</div>
+							<div class="row">
+								<div class="small muted">Score</div>
+								<div
+									id="scoreDisplay"
+									class="score"
+									style="min-width: 78px; margin-left: 8px"
+								>
+									0
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- FLASHCARDS -->
+					<div id="flashScreen" style="display: none">
+						<div
+							style="
+								display: flex;
+								justify-content: space-between;
+								align-items: center;
+							"
+						>
+							<div>
+								<div class="small muted">Flashcard</div>
+								<div id="fcIndex" class="large">1 / 6</div>
+							</div>
+							<div class="small muted">
+								Mode:
+								<select
+									id="flashMode"
+									class="input"
+									style="margin-left: 6px"
+								>
+									<option value="study">Study</option>
+									<option value="test">Test</option>
+								</select>
+							</div>
+						</div>
+
+						<div class="stage flash-wrap" style="margin-top: 12px">
+							<div
+								id="flashCardWrap"
+								class="flash-card"
+								tabindex="0"
+								title="Press Enter or click to flip"
+							>
+								<div class="flash-face front" id="fcFront">
+									Front
+								</div>
+								<div class="flash-face back" id="fcBack">
+									Back
+								</div>
+							</div>
+						</div>
+
+						<div
+							class="controls-row"
+							style="margin-top: 12px; display: flex; gap: 8px"
+						>
+							<button id="prevCard" class="tab">Previous</button>
+							<button id="flipCard" class="tab">Flip</button>
+							<button id="nextCard" class="tab">Next</button>
+							<div style="flex: 1"></div>
+							<button id="shuffleCards" class="btn-ghost">
+								Shuffle
+							</button>
+						</div>
+
+						<div
+							id="testControls"
+							style="display: none; margin-top: 10px"
+						>
+							<div class="small muted">Did you get it right?</div>
+							<div class="row" style="margin-top: 6px">
+								<button id="markRight" class="tab">
+									Right
+								</button>
+								<button id="markWrong" class="btn-ghost">
+									Wrong
+								</button>
+								<div style="flex: 1"></div>
+								<div class="small muted">Progress</div>
+								<div
+									style="width: 160px; margin-left: 8px"
+									class="progress"
+									aria-hidden="true"
+								>
+									<i
+										id="flashProgress"
+										style="
+											display: block;
+											height: 10px;
+											background: linear-gradient(
+												90deg,
+												var(--accent),
+												var(--accent2)
+											);
+											width: 0%;
+										"
+									></i>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- MATCH -->
+					<div id="matchScreen" style="display: none">
+						<div
+							style="
+								display: flex;
+								justify-content: space-between;
+								align-items: center;
+							"
+						>
+							<div>
+								<div class="small muted">Match</div>
+								<div id="matchIndex" class="large">
+									Drag the right word to its match
+								</div>
+							</div>
+							<div class="small muted">
+								Attempts: <span id="matchAttempts">0</span>
+							</div>
+						</div>
+
+						<div
+							style="
+								display: flex;
+								gap: 12px;
+								margin-top: 12px;
+								flex-wrap: wrap;
+							"
+						>
+							<div style="flex: 1; min-width: 220px">
+								<div class="small muted">Draggables</div>
+								<div
+									id="draggables"
+									class="draggables"
+									style="
+										display: grid;
+										gap: 10px;
+										margin-top: 8px;
+									"
+								></div>
+							</div>
+							<div style="flex: 1; min-width: 220px">
+								<div class="small muted">Targets</div>
+								<div
+									id="targets"
+									style="
+										display: grid;
+										gap: 10px;
+										margin-top: 8px;
+									"
+								></div>
+							</div>
+						</div>
+
+						<div class="controls-row" style="margin-top: 12px">
+							<button id="resetMatch" class="tab">Reset</button>
+							<div style="flex: 1"></div>
+							<div class="small muted">Score</div>
+							<div
+								id="matchScore"
+								class="score"
+								style="min-width: 70px; margin-left: 8px"
+							>
+								0
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<aside class="card right-card" aria-label="Game info">
+					<div
+						style="
+							display: flex;
+							justify-content: space-between;
+							align-items: center;
+						"
+					>
+						<div>
+							<div class="small muted">Current Topic</div>
+							<div id="currentTopic" class="large">Mixed</div>
+						</div>
+						<div
+							class="center"
+							style="gap: 8px; flex-direction: column"
+						>
+							<div class="small muted">Top session score</div>
+							<div id="sessionTop" class="score">0</div>
+						</div>
+					</div>
+
+					<hr
+						style="
+							border: none;
+							height: 1px;
+							background: rgba(255, 255, 255, 0.02);
+							margin: 12px 0;
+						"
+					/>
+
+					<div class="small muted">Instructions</div>
+					<div
+						class="tiny"
+						style="margin-top: 6px; color: var(--muted)"
+					>
+						Quick Quiz: 5 questions, 20s each. Select a floating
+						tile to answer.
+						<br /><br />
+						Flashcards: Click or press Enter to flip a 3D card.
+						<br /><br />
+						Drag & Match: Drag tiles into 3D targets.
+					</div>
+
+					<hr
+						style="
+							border: none;
+							height: 1px;
+							background: rgba(255, 255, 255, 0.02);
+							margin: 12px 0;
+						"
+					/>
+
+					<div
+						style="
+							display: flex;
+							gap: 8px;
+							align-items: center;
+							justify-content: space-between;
+						"
+					>
+						<div>
+							<div class="small muted">Session</div>
+							<div id="sessionScore" class="large">0</div>
+						</div>
+						<div>
+							<button id="newRound" class="tab">New Round</button>
+						</div>
+					</div>
+
+					<div style="margin-top: 12px">
+						<div class="small muted">Quick Tips</div>
+						<ul
+							class="tiny"
+							style="
+								padding-left: 16px;
+								margin-top: 8px;
+								color: var(--muted);
+							"
+						>
+							<li>Hover tiles to feel the 3D lift.</li>
+							<li>Flip flashcards with Enter or click.</li>
+							<li>Try different topics from the dropdown.</li>
+						</ul>
+					</div>
+					<footer>
+						<div class="tiny muted">
+							Built with ❤️ — single file
+						</div>
+						<div class="tiny muted">v1.1 — 3D</div>
+					</footer>
+				</aside>
+			</main>
+		</div>
+
+		<script>
+			/* EduPlay 3D - single-file
+   - CSS 3D transforms for depth and flipping
+   - Keeps original logic and data, but renders with 3D visuals
+*/
+
+			/* ---------- DATA (same as earlier) ---------- */
+			const TOPICS = {
+				mixed: {
+					quiz: [
+						{
+							q: "What is 7 × 8?",
+							choices: ["54", "56", "63", "49"],
+							a: 1,
+						},
+						{
+							q: "Which planet is known as the Red Planet?",
+							choices: ["Earth", "Venus", "Mars", "Jupiter"],
+							a: 2,
+						},
+						{
+							q: "H2O is the chemical formula for:",
+							choices: ["Salt", "Oxygen", "Water", "Hydrogen"],
+							a: 2,
+						},
+						{
+							q: "What's the capital of France?",
+							choices: ["Berlin", "Madrid", "Paris", "Rome"],
+							a: 2,
+						},
+						{
+							q: "What is 12 − 5?",
+							choices: ["6", "7", "8", "5"],
+							a: 1,
+						},
+					],
+					flash: [
+						{
+							front: "Photosynthesis",
+							back: "Process plants use to turn sunlight into chemical energy (glucose).",
+						},
+						{
+							front: "Evaporation",
+							back: "When liquid becomes a gas (like water turning into vapor).",
+						},
+						{
+							front: "Mitochondria",
+							back: "Cell organelle that produces energy (the cell's 'powerhouse').",
+						},
+						{
+							front: "Pythagorean theorem",
+							back: "In a right triangle: a² + b² = c².",
+						},
+						{
+							front: "Fraction",
+							back: "A part of a whole, written as a/b.",
+						},
+						{
+							front: "Ecosystem",
+							back: "A community of living things and their environment.",
+						},
+					],
+					match: [
+						[
+							"Oxygen",
+							"A gas plants release during photosynthesis?",
+						],
+						[
+							"Glucose",
+							"A simple sugar and energy product of photosynthesis.",
+						],
+						["Atom", "Smallest unit of an element."],
+						[
+							"Equator",
+							"Imaginary line around the middle of Earth.",
+						],
+					],
+				},
+				math: {
+					quiz: [
+						{
+							q: "What is 9 + 6?",
+							choices: ["14", "15", "16", "13"],
+							a: 1,
+						},
+						{
+							q: "What is 15 ÷ 3?",
+							choices: ["3", "4", "5", "6"],
+							a: 2,
+						},
+						{
+							q: "Square root of 81?",
+							choices: ["7", "8", "9", "10"],
+							a: 2,
+						},
+						{
+							q: "What is 11 × 11?",
+							choices: ["121", "111", "101", "131"],
+							a: 0,
+						},
+						{
+							q: "What is 20% of 50?",
+							choices: ["5", "10", "12", "15"],
+							a: 1,
+						},
+					],
+					flash: [
+						{
+							front: "Prime number",
+							back: "A number greater than 1 that has no positive divisors other than 1 and itself.",
+						},
+						{
+							front: "Mean",
+							back: "The average of a set of numbers.",
+						},
+						{
+							front: "Median",
+							back: "The middle value in a sorted list.",
+						},
+						{
+							front: "Mode",
+							back: "The most frequently occurring value in a dataset.",
+						},
+					],
+					match: [
+						["Perimeter", "Distance around a shape."],
+						["Radius", "Distance from center to edge of a circle."],
+						["Area", "Amount of space inside a 2D shape."],
+						["Volume", "Amount of space a 3D object occupies."],
+					],
+				},
+				science: {
+					quiz: [
+						{
+							q: "What gas do we breathe in to survive?",
+							choices: [
+								"Carbon dioxide",
+								"Oxygen",
+								"Nitrogen",
+								"Hydrogen",
+							],
+							a: 1,
+						},
+						{
+							q: "What force keeps us on the ground?",
+							choices: [
+								"Friction",
+								"Gravity",
+								"Magnetism",
+								"Inertia",
+							],
+							a: 1,
+						},
+						{
+							q: "Which is not a state of matter?",
+							choices: ["Solid", "Liquid", "Gas", "Color"],
+							a: 3,
+						},
+						{
+							q: "Which organ pumps blood?",
+							choices: ["Liver", "Lungs", "Heart", "Kidney"],
+							a: 2,
+						},
+						{
+							q: "What is the center of an atom called?",
+							choices: [
+								"Electron",
+								"Nucleus",
+								"Proton",
+								"Molecule",
+							],
+							a: 1,
+						},
+					],
+					flash: [
+						{
+							front: "Atom",
+							back: "Basic unit of a chemical element.",
+						},
+						{
+							front: "Cell",
+							back: "Smallest unit of living organisms.",
+						},
+						{
+							front: "DNA",
+							back: "Molecule that carries genetic instructions.",
+						},
+					],
+					match: [
+						["Neuron", "Nerve cell that transmits signals."],
+						["Osmosis", "Movement of water through a membrane."],
+						[
+							"Photosynthesis",
+							"Plants converting light to energy.",
+						],
+						[
+							"Catalyst",
+							"Speeds up a chemical reaction without being used up.",
+						],
+					],
+				},
+				geography: {
+					quiz: [
+						{
+							q: "Which continent is Egypt in?",
+							choices: [
+								"Asia",
+								"Africa",
+								"Europe",
+								"South America",
+							],
+							a: 1,
+						},
+						{
+							q: "Mount Everest is in which mountain range?",
+							choices: ["Andes", "Rockies", "Himalayas", "Alps"],
+							a: 2,
+						},
+						{
+							q: "Which ocean is the largest?",
+							choices: [
+								"Atlantic",
+								"Pacific",
+								"Indian",
+								"Arctic",
+							],
+							a: 1,
+						},
+						{
+							q: "What is the capital of Japan?",
+							choices: ["Beijing", "Seoul", "Tokyo", "Bangkok"],
+							a: 2,
+						},
+						{
+							q: "Which country has the largest land area?",
+							choices: ["China", "Russia", "Canada", "USA"],
+							a: 1,
+						},
+					],
+					flash: [
+						{
+							front: "Latitude",
+							back: "Distance north or south of the equator, measured in degrees.",
+						},
+						{
+							front: "Longitude",
+							back: "Distance east or west of the Prime Meridian, measured in degrees.",
+						},
+						{
+							front: "Archipelago",
+							back: "A chain or group of islands.",
+						},
+					],
+					match: [
+						[
+							"Peninsula",
+							"Area of land surrounded by water on three sides.",
+						],
+						[
+							"Isthmus",
+							"Narrow strip of land connecting two larger land areas.",
+						],
+						[
+							"Delta",
+							"Landform at the mouth of a river formed by deposition.",
+						],
+					],
+				},
+			};
+
+			/* ---------- State ---------- */
+			let currentTab = "quiz";
+			let currentTopic = "mixed";
+			let sessionScore = 0;
+			let sessionTop = 0;
+			let highScore = Number(localStorage.getItem("edu_highscore") || 0);
+
+			/* ---------- DOM refs ---------- */
+			const tabs = document.querySelectorAll(".tab[data-tab]");
+			const topicSelect = document.getElementById("topicSelect");
+			const currentTopicLabel = document.getElementById("currentTopic");
+			const quizScreen = document.getElementById("quizScreen");
+			const flashScreen = document.getElementById("flashScreen");
+			const matchScreen = document.getElementById("matchScreen");
+			const qIndex = document.getElementById("qIndex");
+			const questionText = document.getElementById("questionText");
+			const choicesEl = document.getElementById("choices");
+			const timerEl = document.getElementById("timer");
+			const scoreDisplay = document.getElementById("scoreDisplay");
+			const feedback = document.getElementById("feedback");
+			const highScoreEl = document.getElementById("highScore");
+			const sessionScoreEl = document.getElementById("sessionScore");
+			const sessionTopEl = document.getElementById("sessionTop");
+
+			/* ---------- Quiz (3D) ---------- */
+			let quizQuestions = [];
+			let quizIndex = 0;
+			let quizScore = 0;
+			let quizTimer = null;
+			let timeLeft = 20;
+			const QUIZ_TIME = 20;
+			const QUIZ_COUNT = 5;
+
+			const quiz3d = document.getElementById("quiz3d");
+			const qBack = document.getElementById("questionBack");
+
+			function startQuiz() {
+				const pool = (TOPICS[currentTopic].quiz || []).slice();
+				shuffleArray(pool);
+				quizQuestions = pool.slice(0, QUIZ_COUNT);
+				quizIndex = 0;
+				quizScore = 0;
+				sessionScore = 0;
+				updateScoresUI();
+				renderQuizQuestion();
+			}
+
+			function renderQuizQuestion() {
+				if (quizIndex >= quizQuestions.length) {
+					endQuiz();
+					return;
+				}
+				const qObj = quizQuestions[quizIndex];
+				qIndex.textContent =
+					quizIndex + 1 + " / " + quizQuestions.length;
+				questionText.textContent = qObj.q;
+				qBack.textContent = "Answer: " + qObj.choices[qObj.a];
+				choicesEl.innerHTML = "";
+				// create choice tiles with slight 3D random rotation
+				qObj.choices.forEach((c, i) => {
+					const btn = document.createElement("button");
+					btn.className = "choice";
+					btn.textContent = c;
+					btn.dataset.index = i;
+					btn.style.transform = `rotateX(${rand(
+						-3,
+						3
+					)}deg) translateZ(${rand(6, 18)}px)`;
+					btn.addEventListener("click", onChoiceClick);
+					choicesEl.appendChild(btn);
+				});
+				feedback.textContent = "Select an answer to continue.";
+				resetTimer();
+				startTimer();
+				// small entrance animation
+				requestAnimationFrame(() => {
+					quiz3d.classList.add("scene-hover");
+					setTimeout(
+						() => quiz3d.classList.remove("scene-hover"),
+						900
+					);
+				});
+			}
+
+			function onChoiceClick(ev) {
+				const picked = Number(ev.currentTarget.dataset.index);
+				const qObj = quizQuestions[quizIndex];
+				stopTimer();
+				// mark choices
+				const nodes = choicesEl.querySelectorAll(".choice");
+				nodes.forEach((n) => {
+					n.classList.remove("correct", "wrong");
+					n.classList.add("disabled");
+					const idx = Number(n.dataset.index);
+					if (idx === qObj.a) n.classList.add("correct");
+					if (idx === picked && idx !== qObj.a)
+						n.classList.add("wrong");
+					n.disabled = true;
+				});
+				if (picked === qObj.a) {
+					quizScore += 10;
+					feedback.textContent = "Correct! +10 points";
+				} else {
+					feedback.textContent = `Wrong — correct: "${
+						qObj.choices[qObj.a]
+					}".`;
+				}
+				scoreDisplay.textContent = quizScore;
+				sessionScore += Math.max(0, picked === qObj.a ? 10 : 0);
+				updateScoresUI();
+				// flip 3D card briefly to show back
+				quiz3d.style.transform = "rotateY(180deg) translateZ(0)";
+				setTimeout(() => {
+					quiz3d.style.transform = "";
+					quizIndex++;
+					renderQuizQuestion();
+				}, 900);
+			}
+
+			function startTimer() {
+				timeLeft = QUIZ_TIME;
+				updateTimerUI();
+				quizTimer = setInterval(() => {
+					timeLeft--;
+					updateTimerUI();
+					if (timeLeft <= 0) {
+						stopTimer();
+						handleTimeOut();
+					}
+				}, 1000);
+			}
+			function stopTimer() {
+				if (quizTimer) clearInterval(quizTimer);
+				quizTimer = null;
+			}
+			function resetTimer() {
+				stopTimer();
+				timeLeft = QUIZ_TIME;
+				updateTimerUI();
+			}
+			function updateTimerUI() {
+				const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+				const ss = String(timeLeft % 60).padStart(2, "0");
+				timerEl.textContent = mm + ":" + ss;
+				timerEl.style.borderColor =
+					timeLeft <= 5 ? "rgba(239,68,68,0.9)" : "";
+			}
+			function handleTimeOut() {
+				feedback.textContent = "Time's up!";
+				const qObj = quizQuestions[quizIndex];
+				const nodes = choicesEl.querySelectorAll(".choice");
+				nodes.forEach((n) => {
+					if (Number(n.dataset.index) === qObj.a)
+						n.classList.add("correct");
+					n.classList.add("disabled");
+					n.disabled = true;
+				});
+				setTimeout(() => {
+					quizIndex++;
+					renderQuizQuestion();
+				}, 900);
+			}
+			function endQuiz() {
+				stopTimer();
+				feedback.textContent = `Round finished! You scored ${quizScore} points.`;
+				if (quizScore > highScore) {
+					highScore = quizScore;
+					localStorage.setItem("edu_highscore", String(highScore));
+					highScoreEl.textContent = highScore;
+					feedback.textContent += " New high score! 🎉";
+				}
+				sessionTop = Math.max(sessionTop, quizScore);
+				updateScoresUI();
+			}
+
+			/* ---------- Flashcards (3D flip) ---------- */
+			let flashCards = [];
+			let fcIndex = 0;
+			let showingFront = true;
+			let flashMode = "study";
+			let flashRightCount = 0;
+
+			const flashWrap = document.getElementById("flashCardWrap");
+			const fcFront = document.getElementById("fcFront");
+			const fcBack = document.getElementById("fcBack");
+
+			function startFlash() {
+				flashCards = (TOPICS[currentTopic].flash || []).slice();
+				if (!flashCards.length) {
+					fcFront.textContent = "No flashcards for this topic.";
+					fcBack.textContent = "";
+					return;
+				}
+				fcIndex = 0;
+				showingFront = true;
+				flashRightCount = 0;
+				renderFlash();
+			}
+
+			function renderFlash() {
+				if (!flashCards.length) return;
+				const card = flashCards[fcIndex];
+				fcFront.textContent = card.front;
+				fcBack.textContent = card.back;
+				document.getElementById("fcIndex").textContent =
+					fcIndex + 1 + " / " + flashCards.length;
+				document.getElementById("testControls").style.display =
+					flashMode === "test" ? "block" : "none";
+				document.getElementById("flashProgress").style.width =
+					Math.round((flashRightCount / flashCards.length) * 100) +
+					"%";
+				flashWrap.classList.toggle("flipped", !showingFront);
+			}
+
+			/* flashcard controls */
+			document
+				.getElementById("flipCard")
+				.addEventListener("click", () => {
+					showingFront = !showingFront;
+					renderFlash();
+				});
+			document
+				.getElementById("nextCard")
+				.addEventListener("click", () => {
+					fcIndex = (fcIndex + 1) % flashCards.length;
+					showingFront = true;
+					renderFlash();
+				});
+			document
+				.getElementById("prevCard")
+				.addEventListener("click", () => {
+					fcIndex =
+						(fcIndex - 1 + flashCards.length) % flashCards.length;
+					showingFront = true;
+					renderFlash();
+				});
+			document
+				.getElementById("shuffleCards")
+				.addEventListener("click", () => {
+					shuffleArray(flashCards);
+					fcIndex = 0;
+					showingFront = true;
+					renderFlash();
+				});
+			document
+				.getElementById("flashMode")
+				.addEventListener("change", (e) => {
+					flashMode = e.target.value;
+					renderFlash();
+				});
+
+			document
+				.getElementById("markRight")
+				.addEventListener("click", () => {
+					flashRightCount++;
+					sessionScore += 5;
+					updateScoresUI();
+					fcIndex = (fcIndex + 1) % flashCards.length;
+					showingFront = true;
+					renderFlash();
+				});
+			document
+				.getElementById("markWrong")
+				.addEventListener("click", () => {
+					fcIndex = (fcIndex + 1) % flashCards.length;
+					showingFront = true;
+					renderFlash();
+				});
+			/* flip on Enter/Space or click */
+			flashWrap.addEventListener("click", () => {
+				showingFront = !showingFront;
+				renderFlash();
+			});
+			flashWrap.addEventListener("keydown", (e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					showingFront = !showingFront;
+					renderFlash();
+				}
+			});
+
+			/* ---------- Drag & Match (3D) ---------- */
+			let matchPairs = [];
+			let matchScore = 0;
+			let matchAttempts = 0;
+
+			function startMatch() {
+				const pairs = (TOPICS[currentTopic].match || []).slice();
+				if (pairs.length < 2) {
+					document.getElementById("draggables").textContent =
+						"Not enough match items for this topic.";
+					document.getElementById("targets").textContent = "";
+					return;
+				}
+				matchPairs = pairs.map((p, idx) => ({
+					id: idx,
+					left: p[0],
+					right: p[1],
+				}));
+				shuffleArray(matchPairs);
+				renderMatch();
+			}
+
+			function renderMatch() {
+				matchScore = 0;
+				matchAttempts = 0;
+				document.getElementById("matchScore").textContent = matchScore;
+				document.getElementById("matchAttempts").textContent =
+					matchAttempts;
+				const draggables = document.getElementById("draggables");
+				const targets = document.getElementById("targets");
+				draggables.innerHTML = "";
+				targets.innerHTML = "";
+				const leftItems = matchPairs.map((p) => ({
+					id: p.id,
+					text: p.left,
+				}));
+				const rightItems = matchPairs.map((p) => ({
+					id: p.id,
+					text: p.right,
+				}));
+				shuffleArray(leftItems);
+				shuffleArray(rightItems);
+				leftItems.forEach((it) => {
+					const d = document.createElement("div");
+					d.className = "drag-item";
+					d.draggable = true;
+					d.id = "drag-" + it.id;
+					d.textContent = it.text;
+					d.addEventListener("dragstart", onDragStart);
+					d.addEventListener(
+						"touchstart",
+						() => {
+							d.style.transform =
+								"translateZ(18px) rotateX(4deg)";
+						},
+						{ passive: true }
+					);
+					d.addEventListener(
+						"touchend",
+						() => {
+							d.style.transform = "";
+						},
+						{ passive: true }
+					);
+					draggables.appendChild(d);
+				});
+				rightItems.forEach((it) => {
+					const t = document.createElement("div");
+					t.className = "drop-target";
+					t.dataset.expected = it.id;
+					t.id = "target-" + it.id;
+					t.innerHTML = `<div class="tiny muted" style="font-size:13px;">${it.text}</div>`;
+					t.addEventListener("dragover", (e) => e.preventDefault());
+					t.addEventListener("drop", onDrop);
+					targets.appendChild(t);
+				});
+			}
+
+			function onDragStart(e) {
+				e.dataTransfer.setData("text/plain", e.target.id);
+				// add small depth while dragging
+				setTimeout(() => {
+					e.target.style.opacity = "0.92";
+					e.target.style.transform = "translateZ(18px) rotateX(4deg)";
+				}, 5);
+			}
+			function onDrop(e) {
+				e.preventDefault();
+				const dragId = e.dataTransfer.getData("text/plain");
+				const dragged = document.getElementById(dragId);
+				const target = e.currentTarget;
+				const expected = Number(target.dataset.expected);
+				const draggedId = Number(dragged.id.split("-")[1]);
+				matchAttempts++;
+				document.getElementById("matchAttempts").textContent =
+					matchAttempts;
+				if (draggedId === expected) {
+					target.innerHTML = "";
+					dragged.draggable = false;
+					dragged.style.cursor = "default";
+					dragged.style.transform = "translateZ(14px)";
+					target.appendChild(dragged);
+					target.classList.add("correct");
+					matchScore += 10;
+				} else {
+					target.style.border = "2px solid rgba(239,68,68,0.36)";
+					matchScore = Math.max(0, matchScore - 2);
+					setTimeout(() => {
+						target.style.border =
+							"2px dashed rgba(255,255,255,0.03)";
+					}, 700);
+				}
+				document.getElementById("matchScore").textContent = matchScore;
+				sessionScore += Math.max(0, draggedId === expected ? 10 : 0);
+				updateScoresUI();
+			}
+
+			/* ---------- Utilities & wiring ---------- */
+			function shuffleArray(a) {
+				for (let i = a.length - 1; i > 0; i--) {
+					const j = Math.floor(Math.random() * (i + 1));
+					[a[i], a[j]] = [a[j], a[i]];
+				}
+				return a;
+			}
+			function rand(min, max) {
+				return Math.floor(Math.random() * (max - min + 1)) + min;
+			}
+
+			function switchTab(tab) {
+				currentTab = tab;
+				tabs.forEach((t) =>
+					t.classList.toggle("active", t.dataset.tab === tab)
+				);
+				quizScreen.style.display = tab === "quiz" ? "" : "none";
+				flashScreen.style.display = tab === "flash" ? "" : "none";
+				matchScreen.style.display = tab === "match" ? "" : "none";
+				if (tab === "quiz") startQuiz();
+				if (tab === "flash") startFlash();
+				if (tab === "match") startMatch();
+			}
+			tabs.forEach((t) =>
+				t.addEventListener("click", () => switchTab(t.dataset.tab))
+			);
+			topicSelect.addEventListener("change", (e) => {
+				currentTopic = e.target.value;
+				currentTopicLabel.textContent =
+					topicSelect.options[topicSelect.selectedIndex].text;
+				if (currentTab === "quiz") startQuiz();
+				if (currentTab === "flash") startFlash();
+				if (currentTab === "match") startMatch();
+			});
+			document
+				.getElementById("newRound")
+				.addEventListener("click", () => {
+					sessionScore = 0;
+					updateScoresUI();
+					if (currentTab === "quiz") startQuiz();
+				});
+			document
+				.getElementById("resetScores")
+				.addEventListener("click", () => {
+					if (confirm("Reset saved high score?")) {
+						localStorage.removeItem("edu_highscore");
+						highScore = 0;
+						highScoreEl.textContent = highScore;
+					}
+				});
+			document
+				.getElementById("resetMatch")
+				.addEventListener("click", () => startMatch());
+
+			/* keyboard: pick 1-4 for choices */
+			document.addEventListener("keydown", (e) => {
+				if (currentTab !== "quiz") return;
+				if (["1", "2", "3", "4"].includes(e.key)) {
+					const idx = Number(e.key) - 1;
+					const btn = choicesEl.querySelector(
+						`.choice[data-index="${idx}"]`
+					);
+					if (btn && !btn.disabled) btn.click();
+				}
+			});
+
+			/* Score UI update */
+			function updateScoresUI() {
+				scoreDisplay.textContent = quizScore || 0;
+				sessionScoreEl.textContent = sessionScore;
+				sessionTopEl.textContent = sessionTop;
+				highScoreEl.textContent = highScore;
+			}
+
+			/* init */
+			(function init() {
+				highScoreEl.textContent = highScore;
+				currentTopicLabel.textContent =
+					topicSelect.options[topicSelect.selectedIndex].text;
+				switchTab("quiz");
+				sessionScore = 0;
+				updateScoresUI();
+			})();
+
+			/* Prevent accidental text drag selection */
+			document.addEventListener("dragstart", (e) => {
+				if (
+					e.target.classList &&
+					e.target.classList.contains("drag-item")
+				)
+					return;
+				e.preventDefault();
+			});
+		</script>
+	</body>
+</html>
