@@ -3,6 +3,8 @@
 const ROCK = "rock";
 const PAPER = "paper";
 const SCISSORS = "scissors";
+const SHOOT = "shoot";
+const YOURMOM = "your mom";
 
 let tieCount = 0;
 let winCount = 0;
@@ -11,6 +13,8 @@ let lossCount = 0;
 let leftButtonText = "rock";
 let middleButtonText = "Paper";
 let rightButtonText = "Scissors";
+let bottomButtonText= "Shoot";
+let bottomRightButtonText= "Your Mom";
 
 
 /** @type { HTMLElement } */
@@ -81,6 +85,10 @@ const selectComputerWeapon = function () {
 		return SCISSORS;
 	}
 
+	if (rand == 3) {
+		return YOURMOM;
+	}
+
 	throw "I don't know what happened";
 };
 
@@ -136,6 +144,26 @@ function decideResults(player, computer) {
 		result.description = "scissors cleaves paper";
 		return result;
 	}
+
+	if (computer == SCISSORS && player == SHOOT) {
+		result.playerWon = true;
+		result.description = "you shoot your computer";
+		return result;
+	}
+
+	if (computer == ROCK && player == SHOOT) {
+		result.playerWon = true;
+		result.description = "you shoot your computer";
+		return result;
+	}
+
+	if (computer == PAPER && player == SHOOT) {
+		result.playerWon = true;
+		result.description = "you shoot your computer";
+		return result;
+	}
+
+	
 
 	result.description = "Ya broke it...";
 	return result;
