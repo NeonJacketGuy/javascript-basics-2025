@@ -548,10 +548,10 @@ function gameLoop() {
 		ctx.lineWidth = 2;
 
 		ctx.strokeRect(
-			player.x + 12,
-			player.y + 12,
-			player.size - 34,
-			player.size - 34
+			player.x + 1,
+			player.y + 1,
+			player.size - 1,
+			player.size - 1
 		);
 
 		if (laser.firing && laser.beam) {
@@ -814,4 +814,4 @@ function particleLoop() {
 	requestAnimationFrame(particleLoop);
 }
 
-setInterval(createBomb, 3000);
+setInterval(createBomb, Math.random);
