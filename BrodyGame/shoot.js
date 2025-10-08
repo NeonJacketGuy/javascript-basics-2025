@@ -814,4 +814,4 @@ function particleLoop() {
 	requestAnimationFrame(particleLoop);
 }
 
-setInterval(createBomb, Math.random);
+setInterval(createBomb, 1);
