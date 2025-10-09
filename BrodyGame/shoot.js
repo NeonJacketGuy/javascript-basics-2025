@@ -26,12 +26,12 @@ const laser = {
 const player = {
 	x: 50,
 	y: canvas.height / 2,
-	size: 1,
+	size: 60,
 	speedY: 0,
-	gravity: 0.5,
-	jumpPower: -12,
+	gravity: 0.25,
+	jumpPower: -6,
 	isPressingSpace: false,
-	upwardSpeed: -12,
+	upwardSpeed: -6,
 	easingFactor: 0.1,
 };
 
@@ -42,6 +42,7 @@ const imagesToLoad = {
 	building_bottom: "building_bottom.webp",
 	bird: "bird.webp",
 	bomb: "bomb.png",
+	planet: "planet.webp",
 };
 const loadedImages = {};
 let imagesLoadedCount = 0;
@@ -242,48 +243,59 @@ function startScreenShake(targetElement, duration = 400, intensity = 5) {
 
 // Obstacle settings
 const obstacles = [];
-let obstacleSpawnRate = 0.000001;
+let obstacleSpawnRate = 10;
 let obstacleSpawnCounter = 0;
 const obstacleSpeed = 10;
 const pipeGap = 150;
 const pipeWidth = 80;
 
 function createObstacle() {
-	const obstacleType = Math.random();
+  const obstacleType = Math.random();
+  const planetSize = 150; // Set a specific size for the planet
 
-	if (obstacleType < 0.02) {
-		const minGapY = 100;
-		const maxGapY = canvas.height - 100 - pipeGap;
-		const gapY = Math.random() * (maxGapY - minGapY) + minGapY;
-		obstacles.push({
-			x: canvas.width,
-			y: 0,
-			width: pipeWidth,
-			height: gapY,
-			speedX: -obstacleSpeed,
-			image: loadedImages.building_top,
-			type: "building",
-		});
-		obstacles.push({
-			x: canvas.width,
-			y: gapY + pipeGap,
-			width: pipeWidth,
-			height: canvas.height - (gapY + pipeGap),
-			speedX: -obstacleSpeed,
-			image: loadedImages.building_bottom,
-			type: "building",
-		});
-	} else {
-		obstacles.push({
-			x: canvas.width + 50,
-			y: Math.random() * (canvas.height - 50) + 25,
-			width: 40,
-			height: 40,
-			speedX: -(obstacleSpeed + Math.random() * 3),
-			image: loadedImages.bird,
-			type: "bird",
-		});
-	}
+  if (obstacleType < 0.01) { // 1% chance for a large planet
+    obstacles.push({
+      x: canvas.width,
+      y: Math.random() * (canvas.height - planetSize),
+      width: planetSize,
+      height: planetSize,
+      speedX: -(obstacleSpeed * 0.5), // Planets move slower
+      image: loadedImages.planet,
+      type: "planet",
+    });
+  } else if (obstacleType < 0.03) { // 2% chance for buildings (0.01 to 0.03)
+    const minGapY = 100;
+    const maxGapY = canvas.height - 100 - pipeGap;
+    const gapY = Math.random() * (maxGapY - minGapY) + minGapY;
+    obstacles.push({
+      x: canvas.width,
+      y: 0,
+      width: pipeWidth,
+      height: gapY,
+      speedX: -obstacleSpeed,
+      image: loadedImages.building_top,
+      type: "building",
+    });
+    obstacles.push({
+      x: canvas.width,
+      y: gapY + pipeGap,
+      width: pipeWidth,
+      height: canvas.height - (gapY + pipeGap),
+      speedX: -obstacleSpeed,
+      image: loadedImages.building_bottom,
+      type: "building",
+    });
+  } else { // All other times, a bird (0.03 to 1.0)
+    obstacles.push({
+      x: canvas.width + 50,
+      y: Math.random() * (canvas.height - 50) + 25,
+      width: 40,
+      height: 40,
+      speedX: -(obstacleSpeed + Math.random() * 3),
+      image: loadedImages.bird,
+      type: "bird",
+    });
+  }
 }
 
 // Game loop
@@ -333,6 +345,9 @@ function gameLoop() {
 		player.y < shrinkOffset
 	) {
 		endGame();
+		setTimeout(() => {
+			alert(`Score: ${score}`);
+		}, 1000); // 2000 milliseconds = 2 seconds
 		return;
 	}
 	if (
@@ -340,6 +355,9 @@ function gameLoop() {
 		player.x + player.size > effectiveWidth + shrinkOffset
 	) {
 		endGame();
+		setTimeout(() => {
+			alert(`Score: ${score}`);
+		}, 1000); // 2000 milliseconds = 2 seconds
 		return;
 	}
 
@@ -503,13 +521,16 @@ function gameLoop() {
 			}
 		}
 
-		// Collision detection for player and obstacles
+		//  detection for player and obstacles
 		if (
 			player.x + player.size - 12 > obs.x &&
 			player.x + 12 < obs.x + obs.width &&
 			player.y + player.size - 12 > obs.y &&
 			player.y + 12 < obs.y + obs.height
 		) {
+			setTimeout(() => {
+				alert(`Score: ${score}`);
+			}, 1000); // 2000 milliseconds = 2 seconds
 			endGame();
 		}
 
@@ -548,10 +569,10 @@ function gameLoop() {
 		ctx.lineWidth = 2;
 
 		ctx.strokeRect(
-			player.x + 1,
-			player.y + 1,
-			player.size - 1,
-			player.size - 1
+			player.x + 12,
+			player.y + 12,
+			player.size - 34,
+			player.size - 34
 		);
 
 		if (laser.firing && laser.beam) {
@@ -694,7 +715,7 @@ document.addEventListener("keyup", (e) => {
 		// Calculate firing duration based on charge time percentage.
 		// For example, 100% charge (laser.chargeTime) gives a 200ms duration.
 		// A shorter charge time will result in a shorter firing duration.
-		const firingDuration = (laser.chargeCounter / laser.chargeTime) * 2000000000000000;
+		const firingDuration = (laser.chargeCounter / laser.chargeTime) * 2000000000000000000000;
 
 		setTimeout(() => {
 			laser.firing = false;
@@ -779,6 +800,7 @@ function particleLoop() {
 			player.y < bomb.y + bomb.size &&
 			player.y + player.size > bomb.y
 		) {
+			Window.close();
 			// Pass the bomb object to the function
 			activateBomb(bomb);
 			bombs.splice(i, 1); // Remove the collected bomb
