@@ -26,7 +26,7 @@ const laser = {
 const player = {
 	x: 50,
 	y: canvas.height / 2,
-	size: 60,
+	size: 1,
 	speedY: 0,
 	gravity: 0.5,
 	jumpPower: -12,
@@ -242,7 +242,7 @@ function startScreenShake(targetElement, duration = 400, intensity = 5) {
 
 // Obstacle settings
 const obstacles = [];
-let obstacleSpawnRate = 10;
+let obstacleSpawnRate = 0.000001;
 let obstacleSpawnCounter = 0;
 const obstacleSpeed = 10;
 const pipeGap = 150;
