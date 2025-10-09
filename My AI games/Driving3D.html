@@ -249,8 +249,9 @@
 				// Car (box + four cylinders)
 				const car = new THREE.Group();
 				const body = new THREE.Mesh(
-					new THREE.BoxGeometry(2.8, 0.9, 4.8),
+					new THREE.BoxGeometry(20, 1, 10),
 					new THREE.MeshStandardMaterial({ color: 0x1e90ff })
+					//(2.8, 0.9, 4.8)
 				);
 				body.position.y = 1.1;
 				body.castShadow = true;

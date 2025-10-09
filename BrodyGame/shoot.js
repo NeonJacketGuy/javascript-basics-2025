@@ -251,7 +251,7 @@ const pipeWidth = 80;
 
 function createObstacle() {
   const obstacleType = Math.random();
-  const planetSize = 150; // Set a specific size for the planet
+  const planetSize = 1500; // Set a specific size for the planet
 
   if (obstacleType < 0.01) { // 1% chance for a large planet
     obstacles.push({
