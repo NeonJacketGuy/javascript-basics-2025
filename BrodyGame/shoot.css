@@ -1,5 +1,5 @@
 body {
-    background-color: #000;
+    background-color: black;
     color: #fff;
     font-family: monospace;
     display: flex;
@@ -17,7 +17,7 @@ h1 {
 }
 
 canvas {
-    background-color: #000;
+    background-color: lightskyblue;
     border: 2px solid #fff;
     box-shadow: 0 0 10px #fff;
 }

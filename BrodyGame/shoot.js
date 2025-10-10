@@ -251,7 +251,7 @@ const pipeWidth = 80;
 
 function createObstacle() {
   const obstacleType = Math.random();
-  const planetSize = 1500; // Set a specific size for the planet
+  const planetSize = 150; // Set a specific size for the planet
 
   if (obstacleType < 0.01) { // 1% chance for a large planet
     obstacles.push({
@@ -309,7 +309,7 @@ function gameLoop() {
 	const effectiveWidth = canvas.width - shrinkOffset * 2;
 	const effectiveHeight = canvas.height - shrinkOffset * 2;
 
-	ctx.fillStyle = "#000";
+	ctx.fillStyle = "lightskyblue";
 	ctx.fillRect(0, 0, canvas.width, shrinkOffset);
 	ctx.fillRect(0, canvas.height - shrinkOffset, canvas.width, shrinkOffset);
 	ctx.fillRect(
