@@ -309,7 +309,7 @@ function gameLoop() {
 	const effectiveWidth = canvas.width - shrinkOffset * 2;
 	const effectiveHeight = canvas.height - shrinkOffset * 2;
 
-	ctx.fillStyle = "lightskyblue";
+	ctx.fillStyle = "#000";
 	ctx.fillRect(0, 0, canvas.width, shrinkOffset);
 	ctx.fillRect(0, canvas.height - shrinkOffset, canvas.width, shrinkOffset);
 	ctx.fillRect(
@@ -522,17 +522,17 @@ function gameLoop() {
 		}
 
 		//  detection for player and obstacles
-		if (
-			player.x + player.size - 12 > obs.x &&
-			player.x + 12 < obs.x + obs.width &&
-			player.y + player.size - 12 > obs.y &&
-			player.y + 12 < obs.y + obs.height
-		) {
-			setTimeout(() => {
-				alert(`Score: ${score}`);
-			}, 1000); // 2000 milliseconds = 2 seconds
-			endGame();
-		}
+		// if (
+		// 	player.x + player.size - 12 > obs.x &&
+		// 	player.x + 12 < obs.x + obs.width &&
+		// 	player.y + player.size - 12 > obs.y &&
+		// 	player.y + 12 < obs.y + obs.height
+		// ) {
+		// 	setTimeout(() => {
+		// 		alert(`Score: ${score}`);
+		// 	}, 1000); // 2000 milliseconds = 2 seconds
+		// 	endGame();
+		// }
 
 		if (obs.x + obs.width < 0) {
 			obstacles.splice(i, 1);
