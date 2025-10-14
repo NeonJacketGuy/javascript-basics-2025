@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>Slow-Roads-Like Driving + NPCs — Single File</title>
+		<style>
+			:root {
+				--bg: #0b1220;
+				--road: #334;
+				--road-edge: #1c2430;
+				--hud: #e6eef8;
+				--player: #ffcc00;
+				--npc: #ff6b6b;
+			}
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+				background: linear-gradient(#071021, #07101a 60%);
+				font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial;
+			}
+			#gameWrap {
+				height: 100%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				flex-direction: column;
+			}
+			canvas {
+				background: linear-gradient(#07101a, #0a1626 60%);
+				border-radius: 8px;
+				box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+				width: min(980px, 96vw);
+				height: min(720px, 74vh);
+				touch-action: none;
+			}
+			#hud {
+				color: var(--hud);
+				margin-top: 12px;
+				display: flex;
+				gap: 12px;
+				align-items: center;
+			}
+			.btn {
+				background: #ffffff12;
+				border: 1px solid #ffffff18;
+				padding: 6px 10px;
+				border-radius: 6px;
+				color: var(--hud);
+				cursor: pointer;
+			}
+			.small {
+				font-size: 13px;
+				opacity: 0.9;
+			}
+			#overlay {
+				position: absolute;
+				pointer-events: none;
+				inset: 0;
+				display: flex;
+				align-items: flex-start;
+				justify-content: center;
+				padding-top: 28px;
+			}
+			#message {
+				pointer-events: auto;
+				background: #07101acc;
+				color: var(--hud);
+				padding: 12px 16px;
+				border-radius: 8px;
+				border: 1px solid #ffffff15;
+			}
+			@media (max-width: 600px) {
+				#hud {
+					flex-direction: column;
+					gap: 6px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div id="gameWrap">
+			<canvas id="c" width="980" height="640"></canvas>
+			<div id="hud">
+				<div id="score" class="small">Distance: 0m</div>
+				<div id="speed" class="small">Speed: 0</div>
+				<button id="restart" class="btn small">Restart</button>
+				<div style="flex: 1"></div>
+				<div class="small">
+					Controls: ← → or A D to steer, ↑/W accelerate, ↓/S brake
+				</div>
+			</div>
+		</div>
+		<div id="overlay"><div id="message" style="display: none"></div></div>
+
+		<script>
+			/*
+  Single-file "slow roads" inspired driving game with NPCs.
+  - Perspective road (simplified projection).
+  - Player and NPCs are rectangles drawn in perspective.
+  - NPC AI: follow lane, random lane changes, basic collision avoidance.
+*/
+
+			(() => {
+				const canvas = document.getElementById("c");
+				const ctx = canvas.getContext("2d", { alpha: false });
+				let W = canvas.width,
+					H = canvas.height;
+
+				// Game state
+				let running = true;
+				let distance = 0;
+				let speed = 0; // forward speed (affects how fast world scrolls)
+				let targetSpeed = 300; // default max speed
+				const maxSpeed = 700;
+				const accel = 800; // units per second^2
+				const brake = 1200;
+				const friction = 200;
+				let playerX = 0; // lateral position in world coords (-1..1)
+				let playerLane = 0;
+				let steer = 0; // -1..1 from input
+				let lastTime = null;
+				let messageEl = document.getElementById("message");
+
+				// Road parameters
+				const road = {
+					lanes: 3,
+					width: 0.62, // fraction of canvas width at bottom
+					lengthRender: 200, // how many segments to render
+					perspective: 1.8,
+					edgeColor: "#0c1320",
+				};
+
+				// NPCs
+				const npcs = [];
+				const npcPool = [];
+				const npcSpawnRate = 0.9; // average seconds between spawns (depends on speed)
+				let spawnTimer = 0;
+
+				// Player size / appearance
+				const player = {
+					width: 0.17, // world fraction at bottom
+					height: 0.08,
+					color:
+						getComputedStyle(document.documentElement)
+							.getPropertyValue("--player")
+							.trim() || "#ffcc00",
+				};
+
+				// Input handling
+				const keys = {};
+				window.addEventListener("keydown", (e) => {
+					keys[e.key.toLowerCase()] = true;
+					if ([" ", "r"].includes(e.key.toLowerCase()))
+						e.preventDefault();
+				});
+				window.addEventListener("keyup", (e) => {
+					keys[e.key.toLowerCase()] = false;
+				});
+
+				// Touch controls: split screen left/right tap
+				canvas.addEventListener("pointerdown", (e) => {
+					const r = canvas.getBoundingClientRect();
+					const x = (e.clientX - r.left) / r.width;
+					if (x < 0.5) keys["touchleft"] = true;
+					else keys["touchright"] = true;
+				});
+				canvas.addEventListener("pointerup", (e) => {
+					keys["touchleft"] = false;
+					keys["touchright"] = false;
+				});
+				canvas.addEventListener("pointercancel", (e) => {
+					keys["touchleft"] = false;
+					keys["touchright"] = false;
+				});
+
+				// UI
+				document
+					.getElementById("restart")
+					.addEventListener("click", resetGame);
+
+				function resetGame() {
+					distance = 0;
+					speed = 0;
+					targetSpeed = 300;
+					spawnTimer = 0;
+					npcs.length = 0;
+					running = true;
+					messageEl.style.display = "none";
+				}
+
+				// Helper: world-to-screen projection for a point at (laneX: -1..1, z: distance ahead)
+				function project(laneX, z, cameraZ = 0) {
+					// z: forward distance from camera, camera is at 0, so larger z means further away
+					// scale by perspective
+					const perspective = road.perspective;
+					const scale = 1 / (1 + z * 0.002 * perspective);
+					const roadWidthAtZ = W * road.width * scale;
+					const centerX = W / 2 + (laneX * roadWidthAtZ) / 2;
+					const y = H - z * scale * 0.9; // approx
+					return { x: centerX, y, scale, roadWidthAtZ };
+				}
+
+				// Draw the road with perspective lanes
+				function drawRoad() {
+					// road center perspective: draw trapezoid
+					const bottomWidth = W * road.width;
+					ctx.fillStyle = "#101827";
+					ctx.beginPath();
+					ctx.moveTo((W - bottomWidth) / 2, H);
+					ctx.lineTo((W + bottomWidth) / 2, H);
+					// top narrow width
+					const topWidth = bottomWidth * 0.06;
+					const topY = H - road.lengthRender * 0.9;
+					ctx.lineTo((W + topWidth) / 2, topY);
+					ctx.lineTo((W - topWidth) / 2, topY);
+					ctx.closePath();
+					ctx.fill();
+
+					// lane lines (dashed perspective)
+					for (let i = 0; i < road.lanes - 1; i++) {
+						// draw from near to far as many dashes
+						const laneFrac = (i + 1) / road.lanes - 0.5;
+						ctx.strokeStyle = "#cbd5e6";
+						ctx.lineWidth = 2;
+						ctx.setLineDash([10, 14]);
+						ctx.beginPath();
+						for (let z = 0; z < road.lengthRender; z += 6) {
+							const p1 = project(laneFrac, z);
+							const p2 = project(laneFrac, z + 2);
+							ctx.moveTo(p1.x, p1.y);
+							ctx.lineTo(p2.x, p2.y);
+						}
+						ctx.stroke();
+						ctx.setLineDash([]);
+					}
+
+					// road edges
+					const edgeLeft = project(-1, 0);
+					const edgeLeftFar = project(-1, road.lengthRender * 0.9);
+					const edgeRight = project(1, 0);
+					const edgeRightFar = project(1, road.lengthRender * 0.9);
+					ctx.strokeStyle = "#07101a";
+					ctx.lineWidth = 4;
+					ctx.beginPath();
+					ctx.moveTo(
+						edgeLeft.x - edgeLeft.roadWidthAtZ / 2,
+						edgeLeft.y
+					);
+					ctx.lineTo(
+						edgeLeftFar.x - edgeLeftFar.roadWidthAtZ / 2,
+						edgeLeftFar.y
+					);
+					ctx.moveTo(
+						edgeRight.x + edgeRight.roadWidthAtZ / 2,
+						edgeRight.y
+					);
+					ctx.lineTo(
+						edgeRightFar.x + edgeRightFar.roadWidthAtZ / 2,
+						edgeRightFar.y
+					);
+					ctx.stroke();
+				}
+
+				// Convert world lateral position (-1..1) and width fraction to screen rectangle (x,y,w,h)
+				function rectFor(worldX, z, widthFrac, heightFrac) {
+					const p = project(worldX, z);
+					const baseScale = p.scale;
+					// object base width relative to road bottom width at z
+					const w = p.roadWidthAtZ * widthFrac;
+					const h = Math.max(6, H * heightFrac * baseScale);
+					const x = p.x - w / 2;
+					const y = p.y - h;
+					return { x, y, w, h, depth: z, scale: baseScale };
+				}
+
+				// NPC creation
+				function spawnNPC(zAhead) {
+					const laneIndex = Math.floor(Math.random() * road.lanes);
+					const laneX = laneToX(laneIndex);
+					const npc = {
+						id: Math.random().toString(36).slice(2, 9),
+						lane: laneIndex,
+						x: laneX,
+						z: zAhead,
+						width: 0.16 * (0.8 + Math.random() * 0.4),
+						height: 0.09 * (0.7 + Math.random() * 0.6),
+						color:
+							getComputedStyle(document.documentElement)
+								.getPropertyValue("--npc")
+								.trim() || "#ff6b6b",
+						speed: Math.max(60, 180 + (Math.random() - 0.5) * 120), // npc's forward speed (relative)
+						laneChangeTimer: 0,
+						desiredLane: laneIndex,
+					};
+					npcs.push(npc);
+				}
+
+				function laneToX(laneIndex) {
+					// convert lane index 0..lanes-1 to worldX -1..1
+					const frac = (laneIndex / (road.lanes - 1)) * 2 - 1;
+					return frac;
+				}
+
+				// Simple AI update
+				function updateNPCs(dt) {
+					for (let npc of npcs) {
+						npc.laneChangeTimer -= dt;
+						// occasionally decide to change lane
+						if (npc.laneChangeTimer <= 0) {
+							if (Math.random() < 0.25) {
+								// try to move to adjacent lane
+								const dir = Math.random() < 0.5 ? -1 : 1;
+								const newLane = Math.max(
+									0,
+									Math.min(road.lanes - 1, npc.lane + dir)
+								);
+								// check occupancy rough (do not try if another npc at same lane close)
+								if (newLane !== npc.lane) {
+									let safe = true;
+									for (let other of npcs) {
+										if (other === npc) continue;
+										if (
+											other.lane === newLane &&
+											Math.abs(other.z - npc.z) < 40
+										) {
+											safe = false;
+											break;
+										}
+									}
+									if (safe) npc.desiredLane = newLane;
+								}
+							}
+							npc.laneChangeTimer = 1.0 + Math.random() * 2.0; // wait 1-3 seconds
+						}
+
+						// slowly move toward desired lane
+						const targetX = laneToX(npc.desiredLane);
+						const dx = targetX - npc.x;
+						npc.x += dx * Math.min(1, dt * 2.5); // lane change speed
+
+						// move forward relative to player's speed: we simulate world moving opposite direction.
+						// npc.z decreases by (playerSpeed - npc.speed) * dt
+						// Positive npc.speed lower than player leads to overtaking player.
+						npc.z -= (speed - npc.speed) * dt;
+
+						// Basic avoidance: if an NPC ahead in same lane is close, slow down or change lane.
+						for (let other of npcs) {
+							if (other === npc) continue;
+							if (
+								Math.abs(other.x - npc.x) < 0.25 &&
+								other.z > npc.z &&
+								other.z - npc.z < 80
+							) {
+								// someone in front and close -> slow npc
+								npc.z -= 30 * dt;
+								// try to move to a free lane
+								const altLanes = [
+									npc.lane - 1,
+									npc.lane + 1,
+								].filter((l) => l >= 0 && l < road.lanes);
+								for (let l of altLanes) {
+									const lanex = laneToX(l);
+									let blocked = false;
+									for (let o2 of npcs) {
+										if (
+											Math.abs(o2.x - lanex) < 0.25 &&
+											Math.abs(o2.z - npc.z) < 60
+										) {
+											blocked = true;
+											break;
+										}
+									}
+									if (!blocked) {
+										npc.desiredLane = l;
+										break;
+									}
+								}
+							}
+						}
+					}
+					// remove npcs that passed behind the player (z < -20)
+					for (let i = npcs.length - 1; i >= 0; i--) {
+						if (
+							npcs[i].z < -60 ||
+							npcs[i].z > road.lengthRender * 2
+						)
+							npcs.splice(i, 1);
+					}
+				}
+
+				// Collision detection between player and NPC rectangles (approx)
+				function checkCollisions() {
+					// player's projected rect at z ~ 6
+					const playerZ = 6;
+					const pr = rectFor(
+						playerX,
+						playerZ,
+						player.width,
+						player.height
+					);
+					for (let npc of npcs) {
+						const nr = rectFor(npc.x, npc.z, npc.width, npc.height);
+						if (rectOverlap(pr, nr)) {
+							return npc;
+						}
+					}
+					return null;
+				}
+
+				function rectOverlap(a, b) {
+					return !(
+						a.x + a.w < b.x ||
+						b.x + b.w < a.x ||
+						a.y + a.h < b.y ||
+						b.y + b.h < a.y
+					);
+				}
+
+				// Drawing player and NPCs in depth order (far -> near)
+				function drawObjects() {
+					// sort npcs by z descending (far first)
+					const sorted = [...npcs].sort((a, b) => b.z - a.z);
+					for (let npc of sorted) {
+						drawVehicle(
+							npc.x,
+							npc.z,
+							npc.width,
+							npc.height,
+							npc.color
+						);
+					}
+					// draw player at fixed near z
+					drawVehicle(
+						playerX,
+						6,
+						player.width,
+						player.height,
+						player.color,
+						true
+					);
+				}
+
+				function drawVehicle(
+					worldX,
+					z,
+					wFrac,
+					hFrac,
+					color,
+					isPlayer = false
+				) {
+					const r = rectFor(worldX, z, wFrac, hFrac);
+					// shadow
+					ctx.fillStyle = "rgba(0,0,0,0.25)";
+					ctx.fillRect(r.x, r.y + r.h * 0.8, r.w, r.h * 0.2);
+
+					// body
+					ctx.fillStyle = color;
+					roundRect(ctx, r.x, r.y, r.w, r.h, Math.max(3, r.h * 0.18));
+					// highlight
+					ctx.fillStyle = "rgba(255,255,255,0.06)";
+					ctx.fillRect(
+						r.x + r.w * 0.06,
+						r.y + r.h * 0.06,
+						r.w * 0.24,
+						r.h * 0.18
+					);
+					// wheels (small rectangles)
+					const wh = Math.max(3, r.h * 0.17);
+					ctx.fillStyle = "#111";
+					ctx.fillRect(
+						r.x + r.w * 0.08,
+						r.y + r.h * 0.7,
+						r.w * 0.2,
+						wh
+					);
+					ctx.fillRect(
+						r.x + r.w * 0.68,
+						r.y + r.h * 0.7,
+						r.w * 0.2,
+						wh
+					);
+
+					// blink if player
+					if (isPlayer) {
+						// small indicator
+						ctx.fillStyle = "rgba(255,255,255,0.06)";
+						ctx.fillRect(
+							r.x + r.w * 0.4,
+							r.y - Math.max(3, r.h * 0.12),
+							r.w * 0.2,
+							Math.max(3, r.h * 0.07)
+						);
+					}
+				}
+
+				function roundRect(ctx, x, y, w, h, r) {
+					ctx.beginPath();
+					ctx.moveTo(x + r, y);
+					ctx.arcTo(x + w, y, x + w, y + h, r);
+					ctx.arcTo(x + w, y + h, x, y + h, r);
+					ctx.arcTo(x, y + h, x, y, r);
+					ctx.arcTo(x, y, x + w, y, r);
+					ctx.closePath();
+					ctx.fill();
+				}
+
+				// Main loop
+				function frame(ts) {
+					if (!lastTime) lastTime = ts;
+					const dt = Math.min(0.05, (ts - lastTime) / 1000);
+					lastTime = ts;
+
+					// Input -> steering & acceleration
+					let steerInput = 0;
+					if (
+						keys["arrowleft"] ||
+						keys["a"] ||
+						keys["a"] ||
+						keys["touchleft"]
+					)
+						steerInput -= 1;
+					if (keys["arrowright"] || keys["d"] || keys["touchright"])
+						steerInput += 1;
+					steer = steerInput;
+
+					// accelerate/brake
+					let accelInput = 0;
+					if (keys["arrowup"] || keys["w"]) accelInput = 1;
+					if (keys["arrowdown"] || keys["s"]) accelInput = -1;
+
+					// update speed physics
+					if (accelInput > 0) speed += accel * accelInput * dt;
+					else if (accelInput < 0)
+						speed -= brake * Math.abs(accelInput) * dt;
+					else {
+						// natural friction
+						if (speed > 0)
+							speed = Math.max(0, speed - friction * dt);
+						else speed = Math.min(0, speed + friction * dt);
+					}
+					speed = Math.max(0, Math.min(maxSpeed, speed));
+
+					// lateral movement of player
+					// steer controls lateral movement; steering effectiveness depends on speed (higher speed = more sensitive)
+					const steerSpeed = 1.4 + (speed / maxSpeed) * 1.8;
+					playerX += steer * steerSpeed * dt * 0.8;
+					playerX = Math.max(-1.15, Math.min(1.15, playerX)); // clamp slightly outside lanes allowed
+
+					// distance traveled
+					distance += speed * dt * 0.02; // scale down for "meters"
+					// spawn NPCs based on speed and spawnTimer
+					spawnTimer -= dt;
+					const dynamicRate = Math.max(0.2, 1.2 - speed / 800); // faster -> more dense
+					if (spawnTimer <= 0) {
+						const spawnZ =
+							road.lengthRender * 1.1 + Math.random() * 120;
+						spawnNPC(spawnZ);
+						spawnTimer = dynamicRate * (0.5 + Math.random() * 1.1);
+					}
+
+					// update npcs
+					updateNPCs(dt);
+
+					// check collisions
+					const hit = checkCollisions();
+					if (hit) {
+						running = false;
+						showMessage(
+							`You crashed! Distance: ${Math.round(
+								distance
+							)} m — Press Restart`
+						);
+					}
+
+					// draw scene
+					ctx.clearRect(0, 0, W, H);
+					drawBackground();
+					drawRoad();
+					drawObjects();
+					drawHUD();
+
+					if (running) requestAnimationFrame(frame);
+				}
+
+				function drawBackground() {
+					// sky gradient already covered by canvas background; add distant horizon line
+					ctx.fillStyle = "rgba(255,255,255,0.02)";
+					ctx.fillRect(0, H * 0.6, W, 2);
+				}
+
+				function drawHUD() {
+					// small HUD overlay on canvas (optional)
+					ctx.fillStyle = "rgba(0,0,0,0.25)";
+					ctx.fillRect(12, 12, 150, 56);
+					ctx.fillStyle = "#dfe9f8";
+					ctx.font = "14px system-ui,Segoe UI,Roboto,Arial";
+					ctx.fillText(`Distance: ${Math.round(distance)} m`, 20, 34);
+					ctx.fillText(`Speed: ${Math.round(speed)}`, 20, 54);
+
+					// draw lanes indicator at top-left
+					const lx = W - 160,
+						ly = 18,
+						lw = 120,
+						lh = 56;
+					ctx.fillStyle = "rgba(0,0,0,0.22)";
+					ctx.fillRect(lx, ly, lw, lh);
+					ctx.fillStyle = "#fff4";
+					ctx.fillText(`Lanes: ${road.lanes}`, lx + 12, ly + 20);
+					ctx.fillText(`NPCs: ${npcs.length}`, lx + 12, ly + 42);
+				}
+
+				function showMessage(text) {
+					messageEl.textContent = text;
+					messageEl.style.display = "block";
+				}
+
+				// Resize handling
+				function resize() {
+					// keep canvas resolution high for crispness
+					const rect = canvas.getBoundingClientRect();
+					W = canvas.width = Math.max(
+						600,
+						Math.floor(rect.width * devicePixelRatio)
+					);
+					H = canvas.height = Math.max(
+						400,
+						Math.floor((rect.height || 640) * devicePixelRatio)
+					);
+					canvas.style.width = (rect.width || 980) + "px";
+					canvas.style.height = (rect.height || 640) + "px";
+					ctx.setTransform(1, 0, 0, 1, 0, 0);
+					ctx.imageSmoothingEnabled = true;
+				}
+				window.addEventListener("resize", resize);
+				resize();
+
+				// Start loop
+				requestAnimationFrame(frame);
+
+				// expose simple debug keys
+				window.addEventListener("keydown", (e) => {
+					if (e.key === "p") {
+						running = !running;
+						if (running) {
+							lastTime = null;
+							requestAnimationFrame(frame);
+						}
+					}
+					if (e.key === "+") maxSpeed = Math.min(1200, maxSpeed + 50);
+					if (e.key === "-") maxSpeed = Math.max(200, maxSpeed - 50);
+				});
+			})();
+		</script>
+	</body>
+</html>
